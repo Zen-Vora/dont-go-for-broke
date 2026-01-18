@@ -59,7 +59,7 @@ struct GrapherView: View {
                             HStack {
                                 Text(expense.title)
                                 Spacer()
-                                Text("$\(expense.amount)") // Simplified display; format as currency later
+                                Text(expense.amount.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD")))
                             }
                         }
                     }

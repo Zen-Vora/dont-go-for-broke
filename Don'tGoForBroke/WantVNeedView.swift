@@ -10,6 +10,6 @@ import SwiftData
 
 struct WantVNeedView: View {
     var body: some View {
-        Text("Hello, World!")
+        Text("Welcome.")
     }
 }
