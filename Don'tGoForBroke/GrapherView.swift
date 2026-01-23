@@ -19,6 +19,14 @@ struct GrapherView: View {
     @State private var category: String = "General"
     @State private var isRecurring: Bool = false
     
+    @State private var editingExpense: Expense?
+    @State private var editTitle: String = ""
+    @State private var editAmountText: String = ""
+    @State private var editDate: Date = .now
+    @State private var editCategory: String = "General"
+    @State private var editIsRecurring: Bool = false
+    @State private var selectedExpense: Expense?
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Form {
@@ -61,6 +69,51 @@ struct GrapherView: View {
                                 Spacer()
                                 Text(expense.amount.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD")))
                             }
+                            .contentShape(Rectangle())
+                            .background((selectedExpense === expense) ? Color.accentColor.opacity(0.15) : Color.clear)
+                            .onTapGesture {
+                                selectedExpense = expense
+                            }
+                            .swipeActions {
+                                Button {
+                                    // Preload edit fields and present sheet
+                                    editTitle = expense.title
+                                    editAmountText = expense.amount.description
+                                    editDate = expense.date
+                                    editCategory = expense.category
+                                    editIsRecurring = expense.isRecurring
+                                    editingExpense = expense
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+
+                                Button(role: .destructive) {
+                                    modelContext.delete(expense)
+                                    try? modelContext.save()
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .contextMenu {
+                                Button {
+                                    // Preload edit fields and present sheet
+                                    editTitle = expense.title
+                                    editAmountText = expense.amount.description
+                                    editDate = expense.date
+                                    editCategory = expense.category
+                                    editIsRecurring = expense.isRecurring
+                                    editingExpense = expense
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+
+                                Button(role: .destructive) {
+                                    modelContext.delete(expense)
+                                    try? modelContext.save()
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
@@ -73,6 +126,60 @@ struct GrapherView: View {
         }
         .padding()
         .navigationTitle("Expense Grapher")
+        .sheet(item: $editingExpense) { expense in
+            NavigationStack {
+                Form {
+                    Section("Edit Expense") {
+                        TextField("Title", text: $editTitle)
+                        TextField("Amount", text: $editAmountText)
+                        DatePicker("Date", selection: $editDate, displayedComponents: .date)
+                        TextField("Category", text: $editCategory)
+                        Toggle("Recurring", isOn: $editIsRecurring)
+                    }
+                }
+                .navigationTitle("Edit")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            editingExpense = nil
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            if let amount = Decimal(string: editAmountText) {
+                                expense.title = editTitle
+                                expense.amount = amount
+                                expense.date = editDate
+                                expense.category = editCategory
+                                expense.isRecurring = editIsRecurring
+                                try? modelContext.save()
+                                editingExpense = nil
+                            }
+                        }
+                        .disabled(Decimal(string: editAmountText) == nil || editTitle.isEmpty)
+                    }
+                }
+            }
+        }
+        .confirmationDialog("Actions", isPresented: Binding(get: { selectedExpense != nil }, set: { if !$0 { selectedExpense = nil } }), presenting: selectedExpense) { expense in
+            Button("Edit") {
+                // Preload edit fields and present sheet
+                editTitle = expense.title
+                editAmountText = expense.amount.description
+                editDate = expense.date
+                editCategory = expense.category
+                editIsRecurring = expense.isRecurring
+                editingExpense = expense
+                selectedExpense = nil
+            }
+            Button("Delete", role: .destructive) {
+                modelContext.delete(expense)
+                try? modelContext.save()
+                selectedExpense = nil
+            }
+        } message: { expense in
+            Text(expense.title)
+        }
     }
 }
 
