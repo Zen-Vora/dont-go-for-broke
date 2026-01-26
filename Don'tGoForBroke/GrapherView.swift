@@ -9,10 +9,23 @@ import SwiftUI
 import Charts
 import SwiftData
 
+fileprivate struct DailyPoint: Identifiable {
+    let date: Date
+    let total: Double
+    var id: Date { date }
+
+    init(date: Date, total: Double) {
+        self.date = date
+        self.total = total
+    }
+}
+
 struct GrapherView: View {
+    
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
     
+    // Variables for an expense
     @State private var title: String = ""
     @State private var amountText: String = ""
     @State private var date: Date = .now
@@ -27,7 +40,29 @@ struct GrapherView: View {
     @State private var editIsRecurring: Bool = false
     @State private var selectedExpense: Expense?
     
+    private var dailyTotals: [DailyPoint] {
+        let calendar = Calendar.current
+        var grouped: [Date: Double] = [:]
+
+        for expense in expenses {
+            let day = calendar.startOfDay(for: expense.date)
+            let amountDouble = (expense.amount as NSDecimalNumber).doubleValue
+            grouped[day, default: 0] += amountDouble
+        }
+
+        let sortedDays = grouped.keys.sorted()
+
+        var result: [DailyPoint] = []
+        result.reserveCapacity(sortedDays.count)
+        for day in sortedDays {
+            let total = grouped[day] ?? 0
+            result.append(DailyPoint(date: day, total: total))
+        }
+        return result
+    }
+    
     var body: some View {
+        
         VStack(alignment: .leading, spacing: 16) {
             Form {
                 Section("Add Expense") {
@@ -119,10 +154,9 @@ struct GrapherView: View {
                 }
             }
 
-            // Placeholder for a future chart
-            // Chart(...) { ... }
-            //     .frame(height: 240)
-            //     .padding(.top, 8)
+            ExpenseChartView(points: dailyTotals)
+                .frame(height: 240)
+                .padding(.top, 8)
         }
         .padding()
         .navigationTitle("Expense Grapher")
@@ -183,6 +217,71 @@ struct GrapherView: View {
     }
 }
 
+fileprivate struct ExpenseChartView: View {
+    let points: [DailyPoint]
+
+    var body: some View {
+        Chart {
+            ForEach(points) { (point: DailyPoint) in
+                AreaMark(
+                    x: .value("Date", point.date),
+                    y: .value("Total", point.total)
+                )
+                .foregroundStyle(Color.accentColor.opacity(0.25))
+                .interpolationMethod(.catmullRom)
+
+                LineMark(
+                    x: .value("Date", point.date),
+                    y: .value("Total", point.total)
+                )
+                .foregroundStyle(Color.accentColor)
+                .lineStyle(.init(lineWidth: 2))
+                .interpolationMethod(.catmullRom)
+                
+                PointMark(
+                    x: .value("Date", point.date),
+                    y: .value("Total", point.total)
+                )
+                .symbol(.circle)
+                .symbolSize(40)
+                .foregroundStyle(Color.accentColor)
+                .annotation(position: .top, alignment: .center) {
+                    Text(point.total, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.thinMaterial, in: Capsule())
+                }
+            }
+        }
+        .chartXScale(range: .plotDimension(padding: 12))
+        .chartYScale(range: .plotDimension(padding: 12))
+        .chartPlotStyle { plotArea in
+            plotArea
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 6))
+        }
+        .chartXAxisLabel {
+            Text("Date")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading)
+        }
+        .chartYAxisLabel(position: .leading) {
+            Text("Total Spent")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 #Preview {
     GrapherView()
 }
+
