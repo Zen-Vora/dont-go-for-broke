@@ -228,7 +228,7 @@ fileprivate struct ExpenseChartView: View {
                     y: .value("Total", point.total)
                 )
                 .foregroundStyle(Color.accentColor.opacity(0.25))
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(.linear)
 
                 LineMark(
                     x: .value("Date", point.date),
@@ -236,7 +236,7 @@ fileprivate struct ExpenseChartView: View {
                 )
                 .foregroundStyle(Color.accentColor)
                 .lineStyle(.init(lineWidth: 2))
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(.linear)
                 
                 PointMark(
                     x: .value("Date", point.date),
