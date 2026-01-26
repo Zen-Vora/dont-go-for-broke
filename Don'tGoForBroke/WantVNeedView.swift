@@ -37,7 +37,7 @@ struct WantVNeedView: View {
         .init(text: "Is this an impulse purchase?", type: .yesNo, choices: nil, score: { ($0 as? Bool) == true ? 0 : 4 })
     ]
     
-    var body: some View {
+    var body: some View { // Start page
         VStack(spacing: 28) {
             Spacer()
             if currentQuestion == -1 {
@@ -66,7 +66,7 @@ struct WantVNeedView: View {
     }
 
     @ViewBuilder
-    func questionView(for question: Question) -> some View {
+    func questionView(for question: Question) -> some View { // structure for answering questions
         VStack(spacing: 16) {
             Text(question.text.replacingOccurrences(of: "this item", with: itemName))
                 .font(.title2)
