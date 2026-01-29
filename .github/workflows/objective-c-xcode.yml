@@ -1,0 +1,79 @@
+name: Xcode - Build and Analyze
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  ios-simulator:
+    name: Build & Analyze (iOS Simulator)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: Environment & diagnostics
+        run: |
+          echo "== Xcode info =="
+          xcodebuild -version
+          echo "== SDKs =="
+          xcodebuild -showsdks || true
+          echo "== Schemes =="
+          xcodebuild -list || true
+          echo "== Available simulators =="
+          xcrun simctl list devices available || true
+
+      - name: Build (iOS Simulator)
+        env:
+          SCHEME: "Don'tGoForBroke"   # <- update if your scheme name differs
+          DEST_SIM: "platform=iOS Simulator,name=iPhone 14,OS=latest"
+        run: |
+          set -e
+          echo "Building scheme: $SCHEME (iOS simulator)"
+          # If OS=latest isn't available on the runner, change DEST_SIM to a supported OS/version.
+          xcodebuild clean build analyze \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -destination "$DEST_SIM" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            | xcpretty --color && exit ${PIPESTATUS[0]}
+
+  macos:
+    name: Build & Analyze (macOS)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: Environment & diagnostics
+        run: |
+          echo "== Xcode info =="
+          xcodebuild -version
+          echo "== SDKs =="
+          xcodebuild -showsdks || true
+          echo "== Schemes =="
+          xcodebuild -list || true
+
+      - name: Build (macOS)
+        env:
+          SCHEME: "Don'tGoForBroke"   # <- update if your scheme name differs
+        run: |
+          set -e
+          echo "Building scheme: $SCHEME (macOS)"
+          xcodebuild clean build analyze \
+            -scheme "$SCHEME" \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            | xcpretty --color && exit ${PIPESTATUS[0]}
