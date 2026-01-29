@@ -7,24 +7,73 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
-    name: Build and analyse default scheme using xcodebuild command
+  ios-simulator:
+    name: Build & Analyze (iOS Simulator)
     runs-on: macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set Default Scheme
+
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: Environment & diagnostics
         run: |
-          scheme_list=$(xcodebuild -list -json | tr -d "\n")
-          default=$(echo $scheme_list | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
-          echo $default | cat >default
-          echo Using default scheme: $default
-      - name: Build
+          echo "== Xcode info =="
+          xcodebuild -version
+          echo "== SDKs =="
+          xcodebuild -showsdks || true
+          echo "== Schemes =="
+          xcodebuild -list || true
+          echo "== Available simulators =="
+          xcrun simctl list devices available || true
+
+      - name: Build (iOS Simulator)
         env:
-          scheme: ${{ 'default' }}
+          SCHEME: "Don'tGoForBroke"   # <- update if your scheme name differs
+          DEST_SIM: "platform=iOS Simulator,name=iPhone 14,OS=latest"
         run: |
-          if [ $scheme = default ]; then scheme=$(cat default); fi
-          if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \\.xcworkspace\$`"; else filetype_parameter="project" && file_to_build="`ls -A | grep -i \\.xcodeproj\$`"; fi
-          file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build" | xcpretty && exit ${PIPESTATUS[0]}
+          set -e
+          echo "Building scheme: $SCHEME (iOS simulator)"
+          # If OS=latest isn't available on the runner, change DEST_SIM to a supported OS/version.
+          xcodebuild clean build analyze \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -destination "$DEST_SIM" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            | xcpretty --color && exit ${PIPESTATUS[0]}
+
+  macos:
+    name: Build & Analyze (macOS)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: Environment & diagnostics
+        run: |
+          echo "== Xcode info =="
+          xcodebuild -version
+          echo "== SDKs =="
+          xcodebuild -showsdks || true
+          echo "== Schemes =="
+          xcodebuild -list || true
+
+      - name: Build (macOS)
+        env:
+          SCHEME: "Don'tGoForBroke"   # <- update if your scheme name differs
+        run: |
+          set -e
+          echo "Building scheme: $SCHEME (macOS)"
+          xcodebuild clean build analyze \
+            -scheme "$SCHEME" \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            | xcpretty --color && exit ${PIPESTATUS[0]}
