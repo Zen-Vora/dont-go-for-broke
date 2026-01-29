@@ -161,7 +161,7 @@ struct NumberInputView: View {
     var onDone: (Double) -> Void
     var body: some View {
         VStack {
-            TextField("Enter number: ", text: $valueString)
+            TextField("Enter number ", text: $valueString)
 #if os(iOS)
                 .keyboardType(.decimalPad)
 #endif
