@@ -13,7 +13,7 @@ private enum Destination: Hashable {
     case wantNeed
     case grapher
 }
-#endif
+#endif // os(macOS)
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -28,7 +28,7 @@ struct ContentView: View {
 #if os(macOS)
         NavigationSplitView {
             List(selection: $selection) {
-                Section("Features") {
+                Section("Tools") {
                     NavigationLink(value: Destination.wantNeed) {
                         Label("Want vs Need", systemImage: "list.bullet.rectangle")
                     }

@@ -9,6 +9,52 @@ import SwiftUI
 import Charts
 import SwiftData
 
+fileprivate enum ThemeColors {
+    static let green = Color(red: 0.10, green: 0.55, blue: 0.35)
+    static let gold = Color(red: 0.95, green: 0.80, blue: 0.40)
+    static let beige = Color(red: 0.97, green: 0.90, blue: 0.72)
+}
+
+fileprivate func parseAmount(_ text: String) -> Decimal? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty { return nil }
+
+    // Try currency-aware parsing first
+    let currencyFormatter = NumberFormatter()
+    currencyFormatter.numberStyle = .currency
+    currencyFormatter.locale = Locale.current
+    if let number = currencyFormatter.number(from: trimmed) {
+        return number.decimalValue
+    }
+
+    // Try decimal parsing
+    let decimalFormatter = NumberFormatter()
+    decimalFormatter.numberStyle = .decimal
+    decimalFormatter.locale = Locale.current
+    if let number = decimalFormatter.number(from: trimmed) {
+        return number.decimalValue
+    }
+
+    // Fallback: strip currency symbols and grouping separators
+    let currencySymbol = currencyFormatter.currencySymbol ?? "$"
+    let symbols = CharacterSet(charactersIn: currencySymbol).union(.whitespacesAndNewlines)
+    var cleaned = trimmed.components(separatedBy: symbols).joined()
+
+    let grouping = currencyFormatter.groupingSeparator ?? ","
+    cleaned = cleaned.replacingOccurrences(of: grouping, with: "")
+
+    let decimalSep = currencyFormatter.decimalSeparator ?? "."
+    if decimalSep != "." {
+        cleaned = cleaned.replacingOccurrences(of: decimalSep, with: ".")
+    }
+
+    // Keep digits, a single decimal point, and leading sign
+    let validSet = CharacterSet(charactersIn: "0123456789.-")
+    cleaned = cleaned.unicodeScalars.filter { validSet.contains($0) }.map(String.init).joined()
+
+    return Decimal(string: cleaned)
+}
+
 fileprivate struct DailyPoint: Identifiable {
     let date: Date
     let total: Double
@@ -62,147 +108,34 @@ struct GrapherView: View {
     }
     
     var body: some View {
-        
         VStack(alignment: .leading, spacing: 16) {
             Form {
-                Section("Add Expense") {
-                    TextField("Title", text: $title)
-                    TextField("Amount", text: $amountText)
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
-                    TextField("Category", text: $category)
-                    Toggle("Recurring", isOn: $isRecurring)
-
-                    // Insert action: parse amount and save to SwiftData
-                    Button("Add Expense") {
-                        guard let amount = Decimal(string: amountText), !title.isEmpty else { return }
-                        let newExpense = Expense(title: title,
-                                                 amount: amount,
-                                                 date: date,
-                                                 category: category,
-                                                 isRecurring: isRecurring)
-                        modelContext.insert(newExpense)
-                        try? modelContext.save()
-
-                        // Reset inputs
-                        title = ""
-                        amountText = ""
-                        date = .now
-                        category = "General"
-                        isRecurring = false
-                    }
-                    .disabled(title.isEmpty || Decimal(string: amountText) == nil)
-                }
-
-                Section("Recent Expenses") {
-                    if expenses.isEmpty {
-                        Text("No expenses yet.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(expenses) { expense in
-                            HStack {
-                                Text(expense.title)
-                                Spacer()
-                                Text(expense.amount.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD")))
-                            }
-                            .contentShape(Rectangle())
-                            .background((selectedExpense === expense) ? Color.accentColor.opacity(0.15) : Color.clear)
-                            .onTapGesture {
-                                selectedExpense = expense
-                            }
-                            .swipeActions {
-                                Button {
-                                    // Preload edit fields and present sheet
-                                    editTitle = expense.title
-                                    editAmountText = expense.amount.description
-                                    editDate = expense.date
-                                    editCategory = expense.category
-                                    editIsRecurring = expense.isRecurring
-                                    editingExpense = expense
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-
-                                Button(role: .destructive) {
-                                    modelContext.delete(expense)
-                                    try? modelContext.save()
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            .contextMenu {
-                                Button {
-                                    // Preload edit fields and present sheet
-                                    editTitle = expense.title
-                                    editAmountText = expense.amount.description
-                                    editDate = expense.date
-                                    editCategory = expense.category
-                                    editIsRecurring = expense.isRecurring
-                                    editingExpense = expense
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-
-                                Button(role: .destructive) {
-                                    modelContext.delete(expense)
-                                    try? modelContext.save()
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                }
+                addExpenseSection()
+                expensesSection()
             }
+            .scrollContentBackground(.hidden)
+#if os(iOS)
+            .listStyle(.insetGrouped)
+#else
+            .listStyle(.inset)
+#endif
+            .listRowBackground(ThemeColors.green.opacity(0.06))
+            .listRowSeparatorTint(ThemeColors.green.opacity(0.2))
 
             ExpenseChartView(points: dailyTotals)
                 .frame(height: 240)
                 .padding(.top, 8)
         }
         .padding()
+        .background(backgroundGradient)
         .navigationTitle("Expense Grapher")
+        .tint(ThemeColors.green)
         .sheet(item: $editingExpense) { expense in
-            NavigationStack {
-                Form {
-                    Section("Edit Expense") {
-                        TextField("Title", text: $editTitle)
-                        TextField("Amount", text: $editAmountText)
-                        DatePicker("Date", selection: $editDate, displayedComponents: .date)
-                        TextField("Category", text: $editCategory)
-                        Toggle("Recurring", isOn: $editIsRecurring)
-                    }
-                }
-                .navigationTitle("Edit")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            editingExpense = nil
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            if let amount = Decimal(string: editAmountText) {
-                                expense.title = editTitle
-                                expense.amount = amount
-                                expense.date = editDate
-                                expense.category = editCategory
-                                expense.isRecurring = editIsRecurring
-                                try? modelContext.save()
-                                editingExpense = nil
-                            }
-                        }
-                        .disabled(Decimal(string: editAmountText) == nil || editTitle.isEmpty)
-                    }
-                }
-            }
+            editSheetView(expense: expense)
         }
-        .confirmationDialog("Actions", isPresented: Binding(get: { selectedExpense != nil }, set: { if !$0 { selectedExpense = nil } }), presenting: selectedExpense) { expense in
+        .confirmationDialog("Actions", isPresented: isShowingActions, presenting: selectedExpense) { expense in
             Button("Edit") {
-                // Preload edit fields and present sheet
-                editTitle = expense.title
-                editAmountText = expense.amount.description
-                editDate = expense.date
-                editCategory = expense.category
-                editIsRecurring = expense.isRecurring
+                preloadEditFields(from: expense)
                 editingExpense = expense
                 selectedExpense = nil
             }
@@ -213,6 +146,195 @@ struct GrapherView: View {
             }
         } message: { expense in
             Text(expense.title)
+        }
+    }
+
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [ThemeColors.green.opacity(0.12), ThemeColors.gold.opacity(0.10), ThemeColors.beige.opacity(0.04)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
+    private var isShowingActions: Binding<Bool> {
+        Binding(get: { selectedExpense != nil }, set: { if !$0 { selectedExpense = nil } })
+    }
+
+    private func preloadEditFields(from expense: Expense) {
+        editTitle = expense.title
+        editAmountText = expense.amount.description
+        editDate = expense.date
+        editCategory = expense.category
+        editIsRecurring = expense.isRecurring
+    }
+
+    @ViewBuilder
+    private func addExpenseSection() -> some View {
+        Section {
+            TextField("Title", text: $title)
+                .listRowBackground(ThemeColors.beige.opacity(0.15))
+            TextField("Amount", text: $amountText)
+#if os(iOS)
+                .keyboardType(.decimalPad)
+#endif
+                .listRowBackground(ThemeColors.beige.opacity(0.15))
+            DatePicker("Date", selection: $date, displayedComponents: .date)
+                .listRowBackground(ThemeColors.beige.opacity(0.15))
+            TextField("Category", text: $category)
+                .listRowBackground(ThemeColors.beige.opacity(0.15))
+            Toggle("Recurring", isOn: $isRecurring)
+                .listRowBackground(ThemeColors.beige.opacity(0.15))
+
+            // Insert action: parse amount and save to SwiftData
+            Button("Add Expense") {
+                guard let amount = parseAmount(amountText), !title.isEmpty else { return }
+                let newExpense = Expense(title: title,
+                                         amount: amount,
+                                         date: date,
+                                         category: category,
+                                         isRecurring: isRecurring)
+                modelContext.insert(newExpense)
+                try? modelContext.save()
+
+                // Reset inputs
+                title = ""
+                amountText = ""
+                date = .now
+                category = "General"
+                isRecurring = false
+            }
+            .disabled(title.isEmpty || parseAmount(amountText) == nil)
+            .buttonStyle(.glassProminent)
+            .tint(ThemeColors.green)
+        } header: {
+            Text("Add Expense")
+                .font(.headline)
+                .foregroundStyle(ThemeColors.green)
+                .textCase(nil)
+        }
+    }
+
+    @ViewBuilder
+    private func expensesSection() -> some View {
+        Section {
+            if expenses.isEmpty {
+                Text("No expenses yet.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(expenses) { expense in
+                    expenseRow(expense)
+                }
+            }
+        } header: {
+            Text("Recent Expenses")
+                .font(.headline)
+                .foregroundStyle(ThemeColors.green)
+                .textCase(nil)
+        }
+    }
+
+    @ViewBuilder
+    private func expenseRow(_ expense: Expense) -> some View {
+        HStack {
+            Text(expense.title)
+            Spacer()
+            Text(expense.amount.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD")))
+                .foregroundStyle(ThemeColors.green)
+        }
+        .contentShape(Rectangle())
+        .background((selectedExpense === expense) ? ThemeColors.gold.opacity(0.20) : Color.clear)
+        .onTapGesture {
+            selectedExpense = expense
+        }
+        .swipeActions {
+            Button {
+                preloadEditFields(from: expense)
+                editingExpense = expense
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            Button(role: .destructive) {
+                modelContext.delete(expense)
+                try? modelContext.save()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button {
+                preloadEditFields(from: expense)
+                editingExpense = expense
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            Button(role: .destructive) {
+                modelContext.delete(expense)
+                try? modelContext.save()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func editSheetView(expense: Expense) -> some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Title", text: $editTitle)
+                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                    TextField("Amount", text: $editAmountText)
+#if os(iOS)
+                        .keyboardType(.decimalPad)
+#endif
+                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                    DatePicker("Date", selection: $editDate, displayedComponents: .date)
+                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                    TextField("Category", text: $editCategory)
+                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                    Toggle("Recurring", isOn: $editIsRecurring)
+                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                } header: {
+                    Text("Edit Expense")
+                        .font(.headline)
+                        .foregroundStyle(ThemeColors.green)
+                        .textCase(nil)
+                }
+            }
+            .scrollContentBackground(.hidden)
+#if os(iOS)
+            .listStyle(.insetGrouped)
+#else
+            .listStyle(.inset)
+#endif
+            .listRowBackground(ThemeColors.green.opacity(0.06))
+            .listRowSeparatorTint(ThemeColors.green.opacity(0.2))
+            .navigationTitle("Edit")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        editingExpense = nil
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        if let amount = parseAmount(editAmountText) {
+                            expense.title = editTitle
+                            expense.amount = amount
+                            expense.date = editDate
+                            expense.category = editCategory
+                            expense.isRecurring = editIsRecurring
+                            try? modelContext.save()
+                            editingExpense = nil
+                        }
+                    }
+                    .disabled(parseAmount(editAmountText) == nil || editTitle.isEmpty)
+                }
+            }
         }
     }
 }
@@ -227,14 +349,20 @@ fileprivate struct ExpenseChartView: View {
                     x: .value("Date", point.date),
                     y: .value("Total", point.total)
                 )
-                .foregroundStyle(Color.accentColor.opacity(0.25))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [ThemeColors.green.opacity(0.45), ThemeColors.gold.opacity(0.15)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .interpolationMethod(.linear)
 
                 LineMark(
                     x: .value("Date", point.date),
                     y: .value("Total", point.total)
                 )
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ThemeColors.green)
                 .lineStyle(.init(lineWidth: 2))
                 .interpolationMethod(.linear)
                 
@@ -244,14 +372,14 @@ fileprivate struct ExpenseChartView: View {
                 )
                 .symbol(.circle)
                 .symbolSize(40)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ThemeColors.gold)
                 .annotation(position: .top, alignment: .center) {
                     Text(point.total, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ThemeColors.green)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.thinMaterial, in: Capsule())
+                        .glassEffect(.regular.tint(ThemeColors.beige.opacity(0.5)).interactive(), in: .capsule)
                 }
             }
         }
@@ -259,8 +387,7 @@ fileprivate struct ExpenseChartView: View {
         .chartYScale(range: .plotDimension(padding: 12))
         .chartPlotStyle { plotArea in
             plotArea
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .glassEffect(.regular.tint(ThemeColors.beige.opacity(0.35)), in: .rect(cornerRadius: 12))
         }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 6))
@@ -268,7 +395,7 @@ fileprivate struct ExpenseChartView: View {
         .chartXAxisLabel {
             Text("Date")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ThemeColors.green.opacity(0.7))
         }
         .chartYAxis {
             AxisMarks(position: .leading)
@@ -276,7 +403,7 @@ fileprivate struct ExpenseChartView: View {
         .chartYAxisLabel(position: .leading) {
             Text("Total Spent")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ThemeColors.green.opacity(0.7))
         }
     }
 }

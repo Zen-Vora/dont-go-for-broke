@@ -7,6 +7,12 @@
 
 import SwiftUI
 
+fileprivate enum ThemeColors {
+    static let green = Color(red: 0.10, green: 0.55, blue: 0.35)
+    static let gold = Color(red: 0.95, green: 0.80, blue: 0.40)
+    static let beige = Color(red: 0.97, green: 0.90, blue: 0.72)
+}
+
 struct WantVNeedView: View {
     struct Question {
         let text: String
@@ -38,9 +44,21 @@ struct WantVNeedView: View {
         .init(text: "Is this an impulse purchase?", type: .yesNo, choices: nil, score: { ($0 as? Bool) == true ? 0 : 4 })
     ]
     
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [ThemeColors.green.opacity(0.35), ThemeColors.gold.opacity(0.28), ThemeColors.beige.opacity(0.18)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+    
     var body: some View { // Start page
         VStack(spacing: 28) {
             Spacer()
+            if currentQuestion >= 0 && currentQuestion < questions.count {
+                progressHeader
+            }
             if currentQuestion == -1 {
                 VStack(spacing: 12) {
                     Text("What do you want to buy?")
@@ -48,12 +66,18 @@ struct WantVNeedView: View {
                         .bold()
                     TextField("Enter item name: ", text: $itemName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(ThemeColors.gold.opacity(0.22))
+                        )
                         .padding()
                     Button("Start") {
                         answers = []
                         currentQuestion = 0
                     }
                     .disabled(itemName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .buttonStyle(.glassProminent)
                 }
             } else if currentQuestion < questions.count {
                 questionView(for: questions[currentQuestion])
@@ -64,6 +88,16 @@ struct WantVNeedView: View {
         }
         .animation(.default, value: currentQuestion)
         .padding()
+        .background(backgroundGradient)
+        .tint(ThemeColors.green)
+        .navigationTitle("Want vs Need")
+#if os(macOS)
+        .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
+#elseif os(iOS)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+#endif
     }
 
     @ViewBuilder
@@ -80,7 +114,7 @@ struct WantVNeedView: View {
                         answers.append(true)
                         currentQuestion += 1
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
                     Button("No") {
                         answers.append(false)
                         currentQuestion += 1
@@ -94,7 +128,6 @@ struct WantVNeedView: View {
                 }
             case .choices:
                 if let options = question.choices {
-                    // We need a @State for the picker selection; since inside func, use a local @State via wrapper View
                     ChoicesQuestionView(options: options, initialSelection: answers.count > currentQuestion ? answers[currentQuestion] as? Int ?? 0 : 0) { selectedIndex in
                         if answers.count > currentQuestion {
                             answers[currentQuestion] = selectedIndex
@@ -106,6 +139,8 @@ struct WantVNeedView: View {
                 }
             }
         }
+        .padding()
+        .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.30)), in: .rect(cornerRadius: 16))
     }
     
     var resultView: some View {
@@ -142,8 +177,10 @@ struct WantVNeedView: View {
                 currentQuestion = -1
             }
             .padding(.top, 24)
+            .buttonStyle(.glassProminent)
         }
         .padding()
+        .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.30)), in: .rect(cornerRadius: 16))
     }
     
     func summaryText(needPct: Int) -> String {
@@ -154,6 +191,23 @@ struct WantVNeedView: View {
         } else {
             return "\(itemName) is more of a WANT. Think twice before buying."
         }
+    }
+    
+    private var progressHeader: some View {
+        HStack(spacing: 12) {
+            Text("Question \(currentQuestion + 1) of \(questions.count)")
+                .font(.subheadline)
+                .foregroundStyle(ThemeColors.green.opacity(0.9))
+            ProgressView(value: Double(currentQuestion), total: Double(questions.count))
+                .progressViewStyle(.linear)
+        }
+        .padding(.horizontal)
+        .padding(10)
+        .background(
+            Capsule()
+                .fill(ThemeColors.gold.opacity(0.18))
+        )
+        .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.25)), in: .capsule)
     }
 }
 // Helper for number input (price)
@@ -167,13 +221,18 @@ struct NumberInputView: View {
                 .keyboardType(.decimalPad)
 #endif
                 .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(ThemeColors.gold.opacity(0.22))
+                )
                 .padding()
             Button("Next") {
                 let val = Double(valueString) ?? 0
                 onDone(val)
             }
             .disabled(Double(valueString) == nil)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
         }
     }
 }
@@ -198,11 +257,16 @@ struct ChoicesQuestionView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(ThemeColors.gold.opacity(0.18))
+            )
             .padding(.vertical)
             Button("Next") {
                 onNext(selection)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
         }
     }
 }
