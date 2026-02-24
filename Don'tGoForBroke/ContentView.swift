@@ -30,15 +30,15 @@ struct ContentView: View {
 #if os(macOS)
         NavigationSplitView {
             List(selection: $selection) {
+                NavigationLink(value: Destination.settings) {
+                    Label("Settings", systemImage: "gearshape")
+                }
                 Section("Tools") {
                     NavigationLink(value: Destination.wantNeed) {
                         Label("Want vs Need", systemImage: "list.bullet.rectangle")
                     }
                     NavigationLink(value: Destination.grapher) {
                         Label("Expense Grapher", systemImage: "chart.xyaxis.line")
-                    }
-                    NavigationLink(value: Destination.settings) {
-                        Label("Settings", systemImage: "gearshape")
                     }
                 }
             }
