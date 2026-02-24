@@ -12,6 +12,7 @@ import SwiftData
 private enum Destination: Hashable {
     case wantNeed
     case grapher
+    case settings
 }
 #endif // os(macOS)
 
@@ -22,6 +23,7 @@ struct ContentView: View {
 #endif
 #if os(macOS)
     @State private var selection: Destination? = .wantNeed
+    @State private var showingSettings = false
 #endif
     
     var body: some View {
@@ -35,20 +37,14 @@ struct ContentView: View {
                     NavigationLink(value: Destination.grapher) {
                         Label("Expense Grapher", systemImage: "chart.xyaxis.line")
                     }
+                    NavigationLink(value: Destination.settings) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
                 }
             }
             .listStyle(.sidebar)
             .navigationTitle("Don'tGoForBroke")
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        // TODO: Wire to Settings or Preferences
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                }
-            }
         } detail: {
             switch selection {
             case .wantNeed:
@@ -57,6 +53,9 @@ struct ContentView: View {
             case .grapher:
                 GrapherView()
                     .navigationTitle("Expense Grapher")
+            case .settings:
+                SettingsView()
+                    .navigationTitle("Settings")
             case .none:
                 ContentUnavailableView(
                     "Welcome",
@@ -78,6 +77,12 @@ struct ContentView: View {
                     Label("Expense Grapher", systemImage: "chart.xyaxis.line")
                 }
                 .tag(1)
+            
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .tag(2)
         }
 #endif
     }

@@ -9,12 +9,6 @@ import SwiftUI
 import Charts
 import SwiftData
 
-fileprivate enum ThemeColors {
-    static let green = Color(red: 0.10, green: 0.55, blue: 0.35)
-    static let gold = Color(red: 0.95, green: 0.80, blue: 0.40)
-    static let beige = Color(red: 0.97, green: 0.90, blue: 0.72)
-}
-
 fileprivate func parseAmount(_ text: String) -> Decimal? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.isEmpty { return nil }
@@ -70,8 +64,9 @@ struct GrapherView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
-    
+
     // Variables for an expense
+    @AppStorage("settings.accentChoice") private var accentChoice: String = "green"
     @State private var title: String = ""
     @State private var amountText: String = ""
     @State private var date: Date = .now
@@ -86,6 +81,8 @@ struct GrapherView: View {
     @State private var editIsRecurring: Bool = false
     @State private var selectedExpense: Expense?
     
+    private var theme: ThemePalette { ThemePalette(accentChoice: accentChoice) }
+
     private var dailyTotals: [DailyPoint] {
         let calendar = Calendar.current
         var grouped: [Date: Double] = [:]
@@ -119,17 +116,17 @@ struct GrapherView: View {
 #else
             .listStyle(.inset)
 #endif
-            .listRowBackground(ThemeColors.green.opacity(0.06))
-            .listRowSeparatorTint(ThemeColors.green.opacity(0.2))
+            .listRowBackground(theme.primary.opacity(0.06))
+            .listRowSeparatorTint(theme.primary.opacity(0.2))
 
-            ExpenseChartView(points: dailyTotals)
+            ExpenseChartView(theme: theme, points: dailyTotals)
                 .frame(height: 240)
                 .padding(.top, 8)
         }
         .padding()
         .background(backgroundGradient)
         .navigationTitle("Expense Grapher")
-        .tint(ThemeColors.green)
+        .tint(theme.primary)
         .sheet(item: $editingExpense) { expense in
             editSheetView(expense: expense)
         }
@@ -151,7 +148,7 @@ struct GrapherView: View {
 
     private var backgroundGradient: some View {
         LinearGradient(
-            colors: [ThemeColors.green.opacity(0.12), ThemeColors.gold.opacity(0.10), ThemeColors.beige.opacity(0.04)],
+            colors: [theme.primary.opacity(0.12), theme.secondary.opacity(0.10), theme.tertiary.opacity(0.04)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -174,18 +171,18 @@ struct GrapherView: View {
     private func addExpenseSection() -> some View {
         Section {
             TextField("Title", text: $title)
-                .listRowBackground(ThemeColors.beige.opacity(0.15))
+                .listRowBackground(theme.tertiary.opacity(0.15))
             TextField("Amount", text: $amountText)
 #if os(iOS)
                 .keyboardType(.decimalPad)
 #endif
-                .listRowBackground(ThemeColors.beige.opacity(0.15))
+                .listRowBackground(theme.tertiary.opacity(0.15))
             DatePicker("Date", selection: $date, displayedComponents: .date)
-                .listRowBackground(ThemeColors.beige.opacity(0.15))
+                .listRowBackground(theme.tertiary.opacity(0.15))
             TextField("Category", text: $category)
-                .listRowBackground(ThemeColors.beige.opacity(0.15))
+                .listRowBackground(theme.tertiary.opacity(0.15))
             Toggle("Recurring", isOn: $isRecurring)
-                .listRowBackground(ThemeColors.beige.opacity(0.15))
+                .listRowBackground(theme.tertiary.opacity(0.15))
 
             // Insert action: parse amount and save to SwiftData
             Button("Add Expense") {
@@ -207,11 +204,11 @@ struct GrapherView: View {
             }
             .disabled(title.isEmpty || parseAmount(amountText) == nil)
             .buttonStyle(.glassProminent)
-            .tint(ThemeColors.green)
+            .tint(theme.primary)
         } header: {
             Text("Add Expense")
                 .font(.headline)
-                .foregroundStyle(ThemeColors.green)
+                .foregroundStyle(theme.primary)
                 .textCase(nil)
         }
     }
@@ -230,7 +227,7 @@ struct GrapherView: View {
         } header: {
             Text("Recent Expenses")
                 .font(.headline)
-                .foregroundStyle(ThemeColors.green)
+                .foregroundStyle(theme.primary)
                 .textCase(nil)
         }
     }
@@ -241,10 +238,10 @@ struct GrapherView: View {
             Text(expense.title)
             Spacer()
             Text(expense.amount.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD")))
-                .foregroundStyle(ThemeColors.green)
+                .foregroundStyle(theme.primary)
         }
         .contentShape(Rectangle())
-        .background((selectedExpense === expense) ? ThemeColors.gold.opacity(0.20) : Color.clear)
+        .background((selectedExpense === expense) ? theme.secondary.opacity(0.20) : Color.clear)
         .onTapGesture {
             selectedExpense = expense
         }
@@ -286,22 +283,22 @@ struct GrapherView: View {
             Form {
                 Section {
                     TextField("Title", text: $editTitle)
-                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                        .listRowBackground(theme.tertiary.opacity(0.15))
                     TextField("Amount", text: $editAmountText)
 #if os(iOS)
                         .keyboardType(.decimalPad)
 #endif
-                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                        .listRowBackground(theme.tertiary.opacity(0.15))
                     DatePicker("Date", selection: $editDate, displayedComponents: .date)
-                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                        .listRowBackground(theme.tertiary.opacity(0.15))
                     TextField("Category", text: $editCategory)
-                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                        .listRowBackground(theme.tertiary.opacity(0.15))
                     Toggle("Recurring", isOn: $editIsRecurring)
-                        .listRowBackground(ThemeColors.beige.opacity(0.15))
+                        .listRowBackground(theme.tertiary.opacity(0.15))
                 } header: {
                     Text("Edit Expense")
                         .font(.headline)
-                        .foregroundStyle(ThemeColors.green)
+                        .foregroundStyle(theme.primary)
                         .textCase(nil)
                 }
             }
@@ -311,8 +308,8 @@ struct GrapherView: View {
 #else
             .listStyle(.inset)
 #endif
-            .listRowBackground(ThemeColors.green.opacity(0.06))
-            .listRowSeparatorTint(ThemeColors.green.opacity(0.2))
+            .listRowBackground(theme.primary.opacity(0.06))
+            .listRowSeparatorTint(theme.primary.opacity(0.2))
             .navigationTitle("Edit")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -340,6 +337,7 @@ struct GrapherView: View {
 }
 
 fileprivate struct ExpenseChartView: View {
+    let theme: ThemePalette
     let points: [DailyPoint]
 
     var body: some View {
@@ -351,7 +349,7 @@ fileprivate struct ExpenseChartView: View {
                 )
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [ThemeColors.green.opacity(0.45), ThemeColors.gold.opacity(0.15)],
+                        colors: [theme.primary.opacity(0.45), theme.secondary.opacity(0.15)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -362,7 +360,7 @@ fileprivate struct ExpenseChartView: View {
                     x: .value("Date", point.date),
                     y: .value("Total", point.total)
                 )
-                .foregroundStyle(ThemeColors.green)
+                .foregroundStyle(theme.primary)
                 .lineStyle(.init(lineWidth: 2))
                 .interpolationMethod(.linear)
                 
@@ -372,14 +370,14 @@ fileprivate struct ExpenseChartView: View {
                 )
                 .symbol(.circle)
                 .symbolSize(40)
-                .foregroundStyle(ThemeColors.gold)
+                .foregroundStyle(theme.secondary)
                 .annotation(position: .top, alignment: .center) {
                     Text(point.total, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
                         .font(.caption2)
-                        .foregroundStyle(ThemeColors.green)
+                        .foregroundStyle(theme.primary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .glassEffect(.regular.tint(ThemeColors.beige.opacity(0.5)).interactive(), in: .capsule)
+                        .glassEffect(.regular.tint(theme.tertiary.opacity(0.5)).interactive(), in: .capsule)
                 }
             }
         }
@@ -387,7 +385,7 @@ fileprivate struct ExpenseChartView: View {
         .chartYScale(range: .plotDimension(padding: 12))
         .chartPlotStyle { plotArea in
             plotArea
-                .glassEffect(.regular.tint(ThemeColors.beige.opacity(0.35)), in: .rect(cornerRadius: 12))
+                .glassEffect(.regular.tint(theme.tertiary.opacity(0.35)), in: .rect(cornerRadius: 12))
         }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 6))
@@ -395,7 +393,7 @@ fileprivate struct ExpenseChartView: View {
         .chartXAxisLabel {
             Text("Date")
                 .font(.caption)
-                .foregroundStyle(ThemeColors.green.opacity(0.7))
+                .foregroundStyle(theme.primary.opacity(0.7))
         }
         .chartYAxis {
             AxisMarks(position: .leading)
@@ -403,7 +401,7 @@ fileprivate struct ExpenseChartView: View {
         .chartYAxisLabel(position: .leading) {
             Text("Total Spent")
                 .font(.caption)
-                .foregroundStyle(ThemeColors.green.opacity(0.7))
+                .foregroundStyle(theme.primary.opacity(0.7))
         }
     }
 }
@@ -411,4 +409,3 @@ fileprivate struct ExpenseChartView: View {
 #Preview {
     GrapherView()
 }
-

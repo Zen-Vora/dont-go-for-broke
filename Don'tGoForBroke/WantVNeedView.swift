@@ -6,12 +6,9 @@
 //
 
 import SwiftUI
-
-fileprivate enum ThemeColors {
-    static let green = Color(red: 0.10, green: 0.55, blue: 0.35)
-    static let gold = Color(red: 0.95, green: 0.80, blue: 0.40)
-    static let beige = Color(red: 0.97, green: 0.90, blue: 0.72)
-}
+#if os(iOS)
+import AVFoundation
+#endif
 
 struct WantVNeedView: View {
     struct Question {
@@ -25,6 +22,7 @@ struct WantVNeedView: View {
         }
     }
     
+    @AppStorage("settings.accentChoice") private var accentChoice: String = "green"
     @State private var itemName: String = ""
     @State private var currentQuestion: Int = -1 // -1 means entering item name
     @State private var answers: [Any] = []
@@ -44,9 +42,11 @@ struct WantVNeedView: View {
         .init(text: "Is this an impulse purchase?", type: .yesNo, choices: nil, score: { ($0 as? Bool) == true ? 0 : 4 })
     ]
     
+    private var theme: ThemePalette { ThemePalette(accentChoice: accentChoice) }
+
     private var backgroundGradient: some View {
         LinearGradient(
-            colors: [ThemeColors.green.opacity(0.35), ThemeColors.gold.opacity(0.28), ThemeColors.beige.opacity(0.18)],
+            colors: [theme.primary.opacity(0.35), theme.secondary.opacity(0.28), theme.tertiary.opacity(0.18)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -69,7 +69,7 @@ struct WantVNeedView: View {
                         .padding(8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(ThemeColors.gold.opacity(0.22))
+                                .fill(theme.secondary.opacity(0.22))
                         )
                         .padding()
                     Button("Start") {
@@ -89,7 +89,7 @@ struct WantVNeedView: View {
         .animation(.default, value: currentQuestion)
         .padding()
         .background(backgroundGradient)
-        .tint(ThemeColors.green)
+        .tint(theme.primary)
         .navigationTitle("Want vs Need")
 #if os(macOS)
         .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
@@ -112,23 +112,25 @@ struct WantVNeedView: View {
                 HStack(spacing: 32) {
                     Button("Yes") {
                         answers.append(true)
+                        FeedbackManager.tap()
                         currentQuestion += 1
                     }
                     .buttonStyle(.glassProminent)
                     Button("No") {
                         answers.append(false)
+                        FeedbackManager.tap()
                         currentQuestion += 1
                     }
                     .buttonStyle(.bordered)
                 }
             case .number:
-                NumberInputView { number in
-                    answers.append(number)
-                    currentQuestion += 1
+                NumberInputView(theme: theme) { number in
+                    FeedbackManager.tap()
+                    onNumberEntered(number: number)
                 }
             case .choices:
                 if let options = question.choices {
-                    ChoicesQuestionView(options: options, initialSelection: answers.count > currentQuestion ? answers[currentQuestion] as? Int ?? 0 : 0) { selectedIndex in
+                    ChoicesQuestionView(theme: theme, options: options, initialSelection: answers.count > currentQuestion ? answers[currentQuestion] as? Int ?? 0 : 0) { selectedIndex in
                         if answers.count > currentQuestion {
                             answers[currentQuestion] = selectedIndex
                         } else {
@@ -140,7 +142,12 @@ struct WantVNeedView: View {
             }
         }
         .padding()
-        .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.30)), in: .rect(cornerRadius: 16))
+        .glassEffect(.regular.tint(theme.secondary.opacity(0.30)), in: .rect(cornerRadius: 16))
+    }
+    
+    private func onNumberEntered(number: Double) {
+        answers.append(number)
+        currentQuestion += 1
     }
     
     var resultView: some View {
@@ -172,6 +179,7 @@ struct WantVNeedView: View {
                 .font(.title3)
                 .multilineTextAlignment(.center)
             Button("Start Over") {
+                FeedbackManager.warning()
                 itemName = ""
                 answers = []
                 currentQuestion = -1
@@ -180,7 +188,7 @@ struct WantVNeedView: View {
             .buttonStyle(.glassProminent)
         }
         .padding()
-        .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.30)), in: .rect(cornerRadius: 16))
+        .glassEffect(.regular.tint(theme.secondary.opacity(0.30)), in: .rect(cornerRadius: 16))
     }
     
     func summaryText(needPct: Int) -> String {
@@ -197,7 +205,7 @@ struct WantVNeedView: View {
         HStack(spacing: 12) {
             Text("Question \(currentQuestion + 1) of \(questions.count)")
                 .font(.subheadline)
-                .foregroundStyle(ThemeColors.green.opacity(0.9))
+                .foregroundStyle(theme.primary.opacity(0.9))
             ProgressView(value: Double(currentQuestion), total: Double(questions.count))
                 .progressViewStyle(.linear)
         }
@@ -205,13 +213,14 @@ struct WantVNeedView: View {
         .padding(10)
         .background(
             Capsule()
-                .fill(ThemeColors.gold.opacity(0.18))
+                .fill(theme.secondary.opacity(0.18))
         )
-        .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.25)), in: .capsule)
+        .glassEffect(.regular.tint(theme.secondary.opacity(0.25)), in: .capsule)
     }
 }
 // Helper for number input (price)
 struct NumberInputView: View {
+    let theme: ThemePalette
     @State private var valueString = ""
     var onDone: (Double) -> Void
     var body: some View {
@@ -224,14 +233,45 @@ struct NumberInputView: View {
                 .padding(8)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(ThemeColors.gold.opacity(0.22))
+                        .fill(theme.secondary.opacity(0.22))
                 )
                 .padding()
             Button("Next") {
-                let val = Double(valueString) ?? 0
+                // Allow currency symbols and formatting; strip everything except digits, decimal separators, and minus
+                let sanitized = valueString
+                    .replacingOccurrences(of: ",", with: "")
+                    .replacingOccurrences(of: " ", with: "")
+                    .replacingOccurrences(of: "€", with: "")
+                    .replacingOccurrences(of: "£", with: "")
+                    .replacingOccurrences(of: "¥", with: "")
+                    .replacingOccurrences(of: "₹", with: "")
+                    .replacingOccurrences(of: "₩", with: "")
+                    .replacingOccurrences(of: "₽", with: "")
+                    .replacingOccurrences(of: "₺", with: "")
+                    .replacingOccurrences(of: "₫", with: "")
+                    .replacingOccurrences(of: "₴", with: "")
+                    .replacingOccurrences(of: "R$", with: "")
+                    .replacingOccurrences(of: "$", with: "")
+                let val = Double(sanitized) ?? 0
                 onDone(val)
             }
-            .disabled(Double(valueString) == nil)
+            .disabled({
+                let sanitized = valueString
+                    .replacingOccurrences(of: ",", with: "")
+                    .replacingOccurrences(of: " ", with: "")
+                    .replacingOccurrences(of: "€", with: "")
+                    .replacingOccurrences(of: "£", with: "")
+                    .replacingOccurrences(of: "¥", with: "")
+                    .replacingOccurrences(of: "₹", with: "")
+                    .replacingOccurrences(of: "₩", with: "")
+                    .replacingOccurrences(of: "₽", with: "")
+                    .replacingOccurrences(of: "₺", with: "")
+                    .replacingOccurrences(of: "₫", with: "")
+                    .replacingOccurrences(of: "₴", with: "")
+                    .replacingOccurrences(of: "R$", with: "")
+                    .replacingOccurrences(of: "$", with: "")
+                return Double(sanitized) == nil
+            }())
             .buttonStyle(.glassProminent)
         }
     }
@@ -239,11 +279,13 @@ struct NumberInputView: View {
 
 // Separate view for choices question to maintain @State for selection
 struct ChoicesQuestionView: View {
+    let theme: ThemePalette
     let options: [String]
     @State private var selection: Int
     var onNext: (Int) -> Void
     
-    init(options: [String], initialSelection: Int, onNext: @escaping (Int) -> Void) {
+    init(theme: ThemePalette, options: [String], initialSelection: Int, onNext: @escaping (Int) -> Void) {
+        self.theme = theme
         self.options = options
         self._selection = State(initialValue: initialSelection)
         self.onNext = onNext
@@ -260,7 +302,7 @@ struct ChoicesQuestionView: View {
             .padding(8)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(ThemeColors.gold.opacity(0.18))
+                    .fill(theme.secondary.opacity(0.18))
             )
             .padding(.vertical)
             Button("Next") {
@@ -270,4 +312,3 @@ struct ChoicesQuestionView: View {
         }
     }
 }
-
