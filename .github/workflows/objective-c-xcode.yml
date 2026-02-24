@@ -33,7 +33,7 @@ jobs:
       - name: Build (iOS Simulator)
         env:
           SCHEME: "Don'tGoForBroke"   # ← change to exact scheme name if different
-          DEST_SIM: "platform=iOS Simulator,name=iPhone Air,OS=26.2"
+          DEST_SIM: "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2"
         run: |
           set -euo pipefail
           echo "Building scheme: $SCHEME (iOS simulator)"
