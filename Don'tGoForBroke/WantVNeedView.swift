@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 #if os(iOS)
 import AVFoundation
 #endif
@@ -22,10 +23,12 @@ struct WantVNeedView: View {
         }
     }
     
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("settings.accentChoice") private var accentChoice: String = "green"
     @State private var itemName: String = ""
     @State private var currentQuestion: Int = -1 // -1 means entering item name
     @State private var answers: [Any] = []
+    @State private var showingGoalEditor = false
     
     // Questions and logic for scoring answers as 'needness'
     let questions: [Question] = [
@@ -91,6 +94,16 @@ struct WantVNeedView: View {
         .background(backgroundGradient)
         .tint(theme.primary)
         .navigationTitle("Want vs Need")
+        .sheet(isPresented: $showingGoalEditor) {
+            GoalEditorView(
+                prefillTitle: itemName,
+                prefillAmount: estimatedGoalAmount,
+                onSave: { newGoal in
+                    modelContext.insert(newGoal)
+                    try? modelContext.save()
+                }
+            )
+        }
 #if os(macOS)
         .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
@@ -149,6 +162,11 @@ struct WantVNeedView: View {
         answers.append(number)
         currentQuestion += 1
     }
+
+    private var estimatedGoalAmount: Decimal? {
+        guard let price = answers.compactMap({ $0 as? Double }).first else { return nil }
+        return Decimal(price)
+    }
     
     var resultView: some View {
         let totalScore = zip(questions, answers).map { q, a in q.score(a) }.reduce(0, +)
@@ -178,13 +196,19 @@ struct WantVNeedView: View {
             Text(summaryText(needPct: needPct))
                 .font(.title3)
                 .multilineTextAlignment(.center)
+            Button("Save as Goal") {
+                FeedbackManager.tap()
+                showingGoalEditor = true
+            }
+            .buttonStyle(.bordered)
+
             Button("Start Over") {
                 FeedbackManager.warning()
                 itemName = ""
                 answers = []
                 currentQuestion = -1
             }
-            .padding(.top, 24)
+            .padding(.top, 16)
             .buttonStyle(.glassProminent)
         }
         .padding()

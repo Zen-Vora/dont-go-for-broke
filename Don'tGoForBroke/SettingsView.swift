@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("settings.hapticsEnabled") private var hapticsEnabled: Bool = true
 #endif
     @AppStorage("settings.accentChoice") private var accentChoice: String = "green"
+    @AppStorage("settings.userAge") private var userAge: Int = 0
     @Environment(\.dismiss) private var dismiss
 
     private func confirmAndDismiss() {
@@ -23,6 +24,12 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section(header: Text("Profile"), footer: Text("Used to tailor advice for essentials and minor-friendly guidance.")) {
+                Stepper(value: $userAge, in: 0...100) {
+                    Text(userAge > 0 ? "Age: \(userAge)" : "Age: Not set")
+                }
+            }
+
             Section(header: Text("Personalization")) {
                 Picker("Accent color", selection: $accentChoice) {
                     ForEach(accentOptions, id: \.id) { option in

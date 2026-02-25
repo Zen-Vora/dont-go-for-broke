@@ -12,6 +12,8 @@ import SwiftData
 private enum Destination: Hashable {
     case wantNeed
     case grapher
+    case insights
+    case goals
     case settings
 }
 #endif // os(macOS)
@@ -37,6 +39,12 @@ struct ContentView: View {
                     NavigationLink(value: Destination.wantNeed) {
                         Label("Want vs Need", systemImage: "list.bullet.rectangle")
                     }
+                    NavigationLink(value: Destination.insights) {
+                        Label("Insights", systemImage: "chart.pie")
+                    }
+                    NavigationLink(value: Destination.goals) {
+                        Label("Goals", systemImage: "target")
+                    }
                     NavigationLink(value: Destination.grapher) {
                         Label("Expense Grapher", systemImage: "chart.xyaxis.line")
                     }
@@ -53,6 +61,12 @@ struct ContentView: View {
             case .grapher:
                 GrapherView()
                     .navigationTitle("Expense Grapher")
+            case .insights:
+                InsightsView()
+                    .navigationTitle("Insights")
+            case .goals:
+                GoalsView()
+                    .navigationTitle("Goals")
             case .settings:
                 SettingsView()
                     .navigationTitle("Settings")
@@ -72,17 +86,29 @@ struct ContentView: View {
                 }
                 .tag(0)
 
+            InsightsView()
+                .tabItem {
+                    Label("Insights", systemImage: "chart.pie")
+                }
+                .tag(1)
+
+            GoalsView()
+                .tabItem {
+                    Label("Goals", systemImage: "target")
+                }
+                .tag(2)
+            
             GrapherView()
                 .tabItem {
                     Label("Expense Grapher", systemImage: "chart.xyaxis.line")
                 }
-                .tag(1)
-            
+                .tag(3)
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
-                .tag(2)
+                .tag(4)
         }
 #endif
     }

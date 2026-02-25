@@ -49,17 +49,6 @@ fileprivate func parseAmount(_ text: String) -> Decimal? {
     return Decimal(string: cleaned)
 }
 
-fileprivate struct DailyPoint: Identifiable {
-    let date: Date
-    let total: Double
-    var id: Date { date }
-
-    init(date: Date, total: Double) {
-        self.date = date
-        self.total = total
-    }
-}
-
 struct GrapherView: View {
     
     @Environment(\.modelContext) private var modelContext
@@ -84,24 +73,9 @@ struct GrapherView: View {
     private var theme: ThemePalette { ThemePalette(accentChoice: accentChoice) }
 
     private var dailyTotals: [DailyPoint] {
-        let calendar = Calendar.current
-        var grouped: [Date: Double] = [:]
-
-        for expense in expenses {
-            let day = calendar.startOfDay(for: expense.date)
-            let amountDouble = (expense.amount as NSDecimalNumber).doubleValue
-            grouped[day, default: 0] += amountDouble
-        }
-
-        let sortedDays = grouped.keys.sorted()
-
-        var result: [DailyPoint] = []
-        result.reserveCapacity(sortedDays.count)
-        for day in sortedDays {
-            let total = grouped[day] ?? 0
-            result.append(DailyPoint(date: day, total: total))
-        }
-        return result
+        let endDate = ExpenseAnalytics.endDate(for: expenses)
+        let occurrences = ExpenseAnalytics.occurrences(from: expenses, through: endDate)
+        return ExpenseAnalytics.dailyTotals(from: occurrences)
     }
     
     var body: some View {
