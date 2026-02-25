@@ -6,20 +6,16 @@
 //
 
 import SwiftUI
-<<<<<<< Updated upstream
 import SwiftData
 #if os(iOS)
 import AVFoundation
 #endif
-=======
-import Foundation
 
 fileprivate enum ThemeColors {
     static let green = Color(red: 0.10, green: 0.55, blue: 0.35)
     static let gold = Color(red: 0.95, green: 0.80, blue: 0.40)
     static let beige = Color(red: 0.97, green: 0.90, blue: 0.72)
 }
->>>>>>> Stashed changes
 
 struct WantNeedHistoryEntry: Identifiable, Codable, Hashable {
     let id: UUID
@@ -40,26 +36,18 @@ struct WantVNeedView: View {
             case yesNo, number, choices
         }
     }
-<<<<<<< Updated upstream
-    
     @Environment(\.modelContext) private var modelContext
     @AppStorage("settings.accentChoice") private var accentChoice: String = "green"
+    @AppStorage("settings.weeklyIncome") private var weeklyIncome: Double = 0
+    @AppStorage("settings.savingsRate") private var savingsRate: Double = 0.2
     @State private var itemName: String = ""
     @State private var currentQuestion: Int = -1 // -1 means entering item name
     @State private var answers: [Any] = []
     @State private var showingGoalEditor = false
-    
-=======
-
-    @State private var itemName: String = ""
-    @State private var currentQuestion: Int = -1 // -1 means entering item name
-    @State private var answers: [Any] = []
     @AppStorage("wantNeedHistory") private var historyData: String = ""
     @State private var history: [WantNeedHistoryEntry] = []
     @State private var editingEntry: WantNeedHistoryEntry?
     @State private var editingName: String = ""
-
->>>>>>> Stashed changes
     // Questions and logic for scoring answers as 'needness'
     let questions: [Question] = [
         .init(text: "Is this item essential for your daily life?", type: .yesNo, choices: nil, score: { ($0 as? Bool) == true ? 10 : 0 }),
@@ -74,11 +62,7 @@ struct WantVNeedView: View {
         .init(text: "Will it lose most of its value quickly?", type: .yesNo, choices: nil, score: { ($0 as? Bool) == true ? 0 : 5 }),
         .init(text: "Is this an impulse purchase?", type: .yesNo, choices: nil, score: { ($0 as? Bool) == true ? 0 : 4 })
     ]
-<<<<<<< Updated upstream
-    
     private var theme: ThemePalette { ThemePalette(accentChoice: accentChoice) }
-=======
->>>>>>> Stashed changes
 
     private var backgroundGradient: some View {
         LinearGradient(
@@ -136,24 +120,18 @@ struct WantVNeedView: View {
                     history = loadHistory()
                 }
             }
-#if os(iOS)
             .sheet(item: $editingEntry) { entry in
                 VStack(spacing: 16) {
                     Text("Edit History Item")
                         .font(.headline)
                     TextField("Item name", text: $editingName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-<<<<<<< Updated upstream
                         .padding(8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(theme.secondary.opacity(0.22))
                         )
                         .padding()
-                    Button("Start") {
-                        answers = []
-                        currentQuestion = 0
-=======
                     HStack(spacing: 12) {
                         Button("Cancel") {
                             editingEntry = nil
@@ -165,7 +143,6 @@ struct WantVNeedView: View {
                         }
                         .buttonStyle(.glassProminent)
                         .disabled(editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
->>>>>>> Stashed changes
                     }
                 }
                 .padding()
@@ -173,27 +150,16 @@ struct WantVNeedView: View {
                     editingName = entry.itemName
                 }
             }
-<<<<<<< Updated upstream
-            Spacer()
-        }
-        .animation(.default, value: currentQuestion)
-        .padding()
-        .background(backgroundGradient)
-        .tint(theme.primary)
-        .navigationTitle("Want vs Need")
-        .sheet(isPresented: $showingGoalEditor) {
-            GoalEditorView(
-                prefillTitle: itemName,
-                prefillAmount: estimatedGoalAmount,
-                onSave: { newGoal in
-                    modelContext.insert(newGoal)
-                    try? modelContext.save()
-                }
-            )
-        }
-=======
-#endif
->>>>>>> Stashed changes
+            .sheet(isPresented: $showingGoalEditor) {
+                GoalEditorView(
+                    prefillTitle: itemName,
+                    prefillAmount: estimatedGoalAmount,
+                    onSave: { newGoal in
+                        modelContext.insert(newGoal)
+                        try? modelContext.save()
+                    }
+                )
+            }
 #if os(macOS)
             .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
             .toolbarBackground(.visible, for: .windowToolbar)
@@ -287,6 +253,7 @@ struct WantVNeedView: View {
             Text(summaryText(needPct: needPct))
                 .font(.title3)
                 .multilineTextAlignment(.center)
+            planPreview
             Button("Save as Goal") {
                 FeedbackManager.tap()
                 showingGoalEditor = true
@@ -304,14 +271,45 @@ struct WantVNeedView: View {
 
         }
         .padding()
-<<<<<<< Updated upstream
         .glassEffect(.regular.tint(theme.secondary.opacity(0.30)), in: .rect(cornerRadius: 16))
-=======
-        .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.30)), in: .rect(cornerRadius: 16))
         .onAppear {
             saveToHistoryIfNeeded(needPct: needPct, wantPct: wantPct)
         }
->>>>>>> Stashed changes
+    }
+
+    private var planPreview: some View {
+        VStack(spacing: 6) {
+            Text("Plan preview")
+                .font(.subheadline)
+                .foregroundStyle(theme.primary)
+            if let amount = estimatedGoalAmount, amount > 0 {
+                if currentWeeklySavings > 0 {
+                    let weeks = max(1, Int(ceil((amount as NSDecimalNumber).doubleValue / currentWeeklySavings)))
+                    let estimatedDate = Calendar.current.date(byAdding: .day, value: weeks * 7, to: .now) ?? .now
+                    Text("At \(currentWeeklySavings, format: .currency(code: currencyCode))/week, you’ll reach it in \(weeks) weeks.")
+                        .font(.caption)
+                    Text("Estimated date: \(estimatedDate.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Set weekly income and savings rate in Settings to estimate your plan.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("Enter a price to generate a plan preview.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var currentWeeklySavings: Double {
+        max(0, weeklyIncome * savingsRate)
+    }
+
+    private var currencyCode: String {
+        Locale.current.currency?.identifier ?? "USD"
     }
 
     func summaryText(needPct: Int) -> String {
@@ -495,14 +493,9 @@ struct ChoicesQuestionView: View {
     let options: [String]
     @State private var selection: Int
     var onNext: (Int) -> Void
-<<<<<<< Updated upstream
-    
+
     init(theme: ThemePalette, options: [String], initialSelection: Int, onNext: @escaping (Int) -> Void) {
         self.theme = theme
-=======
-
-    init(options: [String], initialSelection: Int, onNext: @escaping (Int) -> Void) {
->>>>>>> Stashed changes
         self.options = options
         self._selection = State(initialValue: initialSelection)
         self.onNext = onNext

@@ -117,6 +117,11 @@ struct GoalsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let planText = goalPlanSummary(for: goal, weeklySavings: weeklySavings) {
+                Text(planText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Divider()
 
@@ -143,6 +148,42 @@ struct GoalsView: View {
         )
         .ignoresSafeArea()
     }
+
+    private func goalPlanSummary(for goal: Goal, weeklySavings: Double) -> String? {
+        let amount = (goal.targetAmount as NSDecimalNumber).doubleValue
+        guard amount > 0 else { return nil }
+        if let targetDate = goal.targetDate {
+            let calendar = Calendar.current
+            let startDate = calendar.startOfDay(for: .now)
+            let endDate = calendar.startOfDay(for: targetDate)
+            let dayCount = calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 0
+            guard dayCount > 0 else { return "Target date is in the past." }
+            let weeks = max(1, Int(ceil(Double(dayCount) / 7.0)))
+            let requiredWeekly = amount / Double(weeks)
+            if weeklySavings > 0 {
+                let extraWeekly = max(0, requiredWeekly - weeklySavings)
+                if extraWeekly > 0 {
+                    return "Need \(formatCurrency(extraWeekly)) more per week to hit the date."
+                }
+                return "On track to hit the date at current savings."
+            }
+            return "Need \(formatCurrency(requiredWeekly)) per week to hit the date."
+        }
+        guard weeklySavings > 0 else { return nil }
+        let weeks = max(1, Int(ceil(amount / weeklySavings)))
+        return "At \(formatCurrency(weeklySavings))/week, you’ll reach it in \(weeks) weeks."
+    }
+
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    private var currencyCode: String {
+        Locale.current.currency?.identifier ?? "USD"
+    }
 }
 
 private struct GoalPlannerView: View {
@@ -166,27 +207,52 @@ private struct GoalPlannerView: View {
                 .keyboardType(.decimalPad)
 #endif
                 .textFieldStyle(RoundedBorderTextFieldStyle())
+                .onChange(of: weeklyIncomeText) { _, newValue in
+                    weeklyIncome = parsedIncome(from: newValue)
+                }
+                .onSubmit {
+                    weeklyIncome = parsedIncome(from: weeklyIncomeText)
+                }
 
             HStack {
                 Text("Savings rate")
                     .font(.caption)
-                Slider(value: $localSavingsRate, in: 0...0.8, step: 0.05)
+                Slider(value: $localSavingsRate, in: 0...1.0, step: 0.05)
+                    .onChange(of: localSavingsRate) { _, newValue in
+                        savingsRate = newValue
+                    }
                 Text("\(Int(localSavingsRate * 100))%")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Button("Update Plan") {
-                let parsed = Double(weeklyIncomeText.replacingOccurrences(of: ",", with: "")) ?? 0
-                weeklyIncome = parsed
-                savingsRate = localSavingsRate
-            }
-            .buttonStyle(.bordered)
         }
         .onAppear {
             weeklyIncomeText = weeklyIncome == 0 ? "" : String(format: "%.2f", weeklyIncome)
             localSavingsRate = savingsRate
         }
+        .onDisappear {
+            weeklyIncome = parsedIncome(from: weeklyIncomeText)
+            savingsRate = localSavingsRate
+        }
+    }
+
+    private func parsedIncome(from text: String) -> Double {
+        let sanitized = text
+            .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: "€", with: "")
+            .replacingOccurrences(of: "£", with: "")
+            .replacingOccurrences(of: "¥", with: "")
+            .replacingOccurrences(of: "₹", with: "")
+            .replacingOccurrences(of: "₩", with: "")
+            .replacingOccurrences(of: "₽", with: "")
+            .replacingOccurrences(of: "₺", with: "")
+            .replacingOccurrences(of: "₫", with: "")
+            .replacingOccurrences(of: "₴", with: "")
+            .replacingOccurrences(of: "R$", with: "")
+        return Double(sanitized) ?? 0
     }
 }
 
