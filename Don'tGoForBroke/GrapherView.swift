@@ -122,7 +122,7 @@ struct GrapherView: View {
 
     private var backgroundGradient: some View {
         LinearGradient(
-            colors: [theme.primary.opacity(0.12), theme.secondary.opacity(0.10), theme.tertiary.opacity(0.04)],
+            colors: [theme.primary.opacity(0.20), theme.secondary.opacity(0.16), theme.tertiary.opacity(0.08)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )

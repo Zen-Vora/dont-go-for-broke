@@ -74,99 +74,93 @@ struct WantVNeedView: View {
     }
 
     var body: some View { // Start page
-        NavigationStack {
-            VStack(spacing: 28) {
-                Spacer()
-                if currentQuestion >= 0 && currentQuestion < questions.count {
-                    progressHeader
-                }
-                if currentQuestion == -1 {
-                    VStack(spacing: 12) {
-                        Text("What do you want to buy?")
-                            .font(.title)
-                            .bold()
-                        TextField("Enter item name: ", text: $itemName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .padding(8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(ThemeColors.gold.opacity(0.22))
-                            )
-                            .padding()
-                        Button("Start") {
-                            answers = []
-                            currentQuestion = 0
-                        }
-                        .disabled(itemName.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .buttonStyle(.glassProminent)
-                    }
-                    if !history.isEmpty {
-                        historySection
-                    }
-                } else if currentQuestion < questions.count {
-                    questionView(for: questions[currentQuestion])
-                } else {
-                    resultView
-                }
-                Spacer()
+        VStack(spacing: 28) {
+            Spacer()
+            if currentQuestion >= 0 && currentQuestion < questions.count {
+                progressHeader
             }
-            .animation(.default, value: currentQuestion)
-            .padding()
-            .background(backgroundGradient)
-            .tint(ThemeColors.green)
-            .navigationTitle("Want vs Need")
-            .onAppear {
-                if history.isEmpty {
-                    history = loadHistory()
-                }
-            }
-            .sheet(item: $editingEntry) { entry in
-                VStack(spacing: 16) {
-                    Text("Edit History Item")
-                        .font(.headline)
-                    TextField("Item name", text: $editingName)
+            if currentQuestion == -1 {
+                VStack(spacing: 12) {
+                    Text("What do you want to buy?")
+                        .font(.title)
+                        .bold()
+                    TextField("Enter item name: ", text: $itemName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding(8)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(theme.secondary.opacity(0.22))
+                                .fill(ThemeColors.gold.opacity(0.22))
                         )
                         .padding()
-                    HStack(spacing: 12) {
-                        Button("Cancel") {
-                            editingEntry = nil
-                        }
-                        .buttonStyle(.bordered)
-                        Button("Save") {
-                            updateHistoryEntry(entry: entry, newName: editingName)
-                            editingEntry = nil
-                        }
-                        .buttonStyle(.glassProminent)
-                        .disabled(editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Start") {
+                        answers = []
+                        currentQuestion = 0
                     }
+                    .disabled(itemName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .buttonStyle(.glassProminent)
                 }
-                .padding()
-                .onAppear {
-                    editingName = entry.itemName
+                if !history.isEmpty {
+                    historySection
                 }
+            } else if currentQuestion < questions.count {
+                questionView(for: questions[currentQuestion])
+            } else {
+                resultView
             }
-            .sheet(isPresented: $showingGoalEditor) {
-                GoalEditorView(
-                    prefillTitle: itemName,
-                    prefillAmount: estimatedGoalAmount,
-                    onSave: { newGoal in
-                        modelContext.insert(newGoal)
-                        try? modelContext.save()
-                    }
-                )
-            }
-#if os(macOS)
-            .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
-            .toolbarBackground(.visible, for: .windowToolbar)
-#elseif os(iOS)
-            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
-            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+            Spacer()
+        }
+        .animation(.default, value: currentQuestion)
+        .padding()
+        .background(backgroundGradient)
+        .tint(ThemeColors.green)
+        .navigationTitle("Want vs Need")
+#if os(iOS)
+        .toolbarBackground(.hidden, for: .navigationBar)
 #endif
+        .onAppear {
+            if history.isEmpty {
+                history = loadHistory()
+            }
+        }
+        .sheet(item: $editingEntry) { entry in
+            VStack(spacing: 16) {
+                Text("Edit History Item")
+                    .font(.headline)
+                TextField("Item name", text: $editingName)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(theme.secondary.opacity(0.22))
+                    )
+                    .padding()
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        editingEntry = nil
+                    }
+                    .buttonStyle(.bordered)
+                    Button("Save") {
+                        updateHistoryEntry(entry: entry, newName: editingName)
+                        editingEntry = nil
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(editingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding()
+            .onAppear {
+                editingName = entry.itemName
+            }
+        }
+        .sheet(isPresented: $showingGoalEditor) {
+            GoalEditorView(
+                prefillTitle: itemName,
+                prefillAmount: estimatedGoalAmount,
+                onSave: { newGoal in
+                    modelContext.insert(newGoal)
+                    try? modelContext.save()
+                }
+            )
         }
     }
 
