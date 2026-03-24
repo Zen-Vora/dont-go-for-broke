@@ -4,6 +4,7 @@ import SwiftData
 struct GoalsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
+    @Query(sort: \MoneyEntry.date, order: .reverse) private var moneyEntries: [MoneyEntry]
     @AppStorage("settings.accentChoice") private var accentChoice: String = "green"
     @AppStorage("settings.weeklyIncome") private var weeklyIncome: Double = 0
     @AppStorage("settings.savingsRate") private var savingsRate: Double = 0.2
@@ -74,10 +75,12 @@ struct GoalsView: View {
             }
             .buttonStyle(.glassProminent)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func goalCard(_ goal: Goal) -> some View {
         let targetAmount = (goal.targetAmount as NSDecimalNumber).doubleValue
+        let savedAmount = savedAmount(for: goal)
         let weeklySavings = max(0, weeklyIncome * savingsRate)
         let weeksNeeded = weeklySavings > 0 ? (targetAmount / weeklySavings) : nil
 
@@ -123,11 +126,35 @@ struct GoalsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if targetAmount > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: min(savedAmount, targetAmount), total: targetAmount)
+                        .tint(theme.primary)
+                    Text("Saved \(formatCurrency(savedAmount)) of \(formatCurrency(targetAmount))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if savedAmount >= targetAmount {
+                        Text("Goal reached!")
+                            .font(.caption)
+                            .foregroundStyle(theme.primary)
+                    } else {
+                        Text("Remaining: \(formatCurrency(max(0, targetAmount - savedAmount)))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Text("Set a target amount to track progress.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Divider()
 
             GoalPlannerView()
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.secondary.opacity(0.24)), in: .rect(cornerRadius: 16))
         .contextMenu {
             Button("Edit") {
@@ -172,6 +199,12 @@ struct GoalsView: View {
         guard weeklySavings > 0 else { return nil }
         let weeks = max(1, Int(ceil(amount / weeklySavings)))
         return "At \(formatCurrency(weeklySavings))/week, you’ll reach it in \(weeks) weeks."
+    }
+
+    private func savedAmount(for goal: Goal) -> Double {
+        moneyEntries
+            .filter { $0.goal?.persistentModelID == goal.persistentModelID }
+            .reduce(0) { $0 + ($1.amount as NSDecimalNumber).doubleValue }
     }
 
     private func formatCurrency(_ value: Double) -> String {

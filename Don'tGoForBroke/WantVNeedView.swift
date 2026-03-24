@@ -212,6 +212,7 @@ struct WantVNeedView: View {
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.secondary.opacity(0.30)), in: .rect(cornerRadius: 16))
     }
     
@@ -241,7 +242,8 @@ struct WantVNeedView: View {
             }
         }.reduce(0, +)
         let pct = maxScore > 0 ? Double(totalScore) / Double(maxScore) : 0
-        let needPct = Int((pct * 100).rounded())
+        let rawNeedPct = Int((pct * 100).rounded())
+        let needPct = min(100, max(0, rawNeedPct))
         let wantPct = 100 - needPct
         return VStack(spacing: 16) {
             Text("Your Result:")
@@ -271,6 +273,7 @@ struct WantVNeedView: View {
 
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.secondary.opacity(0.30)), in: .rect(cornerRadius: 16))
         .onAppear {
             saveToHistoryIfNeeded(needPct: needPct, wantPct: wantPct)
@@ -327,7 +330,7 @@ struct WantVNeedView: View {
             Text("Question \(currentQuestion + 1) of \(questions.count)")
                 .font(.subheadline)
                 .foregroundStyle(theme.primary.opacity(0.9))
-            ProgressView(value: Double(currentQuestion), total: Double(questions.count))
+            ProgressView(value: Double(currentQuestion + 1), total: Double(questions.count))
                 .progressViewStyle(.linear)
         }
         .padding(.horizontal)
@@ -374,6 +377,7 @@ struct WantVNeedView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(ThemeColors.gold.opacity(0.22)), in: .rect(cornerRadius: 16))
     }
 

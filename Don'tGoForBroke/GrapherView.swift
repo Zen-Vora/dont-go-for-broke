@@ -53,6 +53,8 @@ struct GrapherView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
+    @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
+    @Query(sort: \MoneyEntry.date, order: .reverse) private var moneyEntries: [MoneyEntry]
 
     // Variables for an expense
     @AppStorage("settings.accentChoice") private var accentChoice: String = "green"
@@ -61,6 +63,10 @@ struct GrapherView: View {
     @State private var date: Date = .now
     @State private var category: String = "General"
     @State private var isRecurring: Bool = false
+
+    @State private var moneyAmountText: String = ""
+    @State private var moneyDate: Date = .now
+    @State private var selectedGoalID: PersistentIdentifier?
     
     @State private var editingExpense: Expense?
     @State private var editTitle: String = ""
@@ -82,6 +88,8 @@ struct GrapherView: View {
         VStack(alignment: .leading, spacing: 16) {
             Form {
                 addExpenseSection()
+                addMoneySection()
+                moneyEntriesSection()
                 expensesSection()
             }
             .scrollContentBackground(.hidden)
@@ -96,6 +104,7 @@ struct GrapherView: View {
             ExpenseChartView(theme: theme, points: dailyTotals)
                 .frame(height: 240)
                 .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .background(backgroundGradient)
@@ -141,6 +150,10 @@ struct GrapherView: View {
         editIsRecurring = expense.isRecurring
     }
 
+    private var selectedGoal: Goal? {
+        goals.first { $0.persistentModelID == selectedGoalID }
+    }
+
     @ViewBuilder
     private func addExpenseSection() -> some View {
         Section {
@@ -181,6 +194,72 @@ struct GrapherView: View {
             .tint(theme.primary)
         } header: {
             Text("Add Expense")
+                .font(.headline)
+                .foregroundStyle(theme.primary)
+                .textCase(nil)
+        }
+    }
+
+    @ViewBuilder
+    private func addMoneySection() -> some View {
+        Section {
+            TextField("Amount", text: $moneyAmountText)
+#if os(iOS)
+                .keyboardType(.decimalPad)
+#endif
+                .listRowBackground(theme.tertiary.opacity(0.15))
+            DatePicker("Date", selection: $moneyDate, displayedComponents: .date)
+                .listRowBackground(theme.tertiary.opacity(0.15))
+
+            if goals.isEmpty {
+                Text("Create a goal to allocate savings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .listRowBackground(theme.tertiary.opacity(0.15))
+            } else {
+                Picker("Allocate to goal", selection: $selectedGoalID) {
+                    Text("No goal").tag(Optional<PersistentIdentifier>.none)
+                    ForEach(goals) { goal in
+                        Text(goal.title).tag(Optional(goal.persistentModelID))
+                    }
+                }
+                .listRowBackground(theme.tertiary.opacity(0.15))
+            }
+
+            Button("Add Money") {
+                guard let amount = parseAmount(moneyAmountText) else { return }
+                let entry = MoneyEntry(amount: amount, date: moneyDate, goal: selectedGoal)
+                modelContext.insert(entry)
+                try? modelContext.save()
+
+                moneyAmountText = ""
+                moneyDate = .now
+                selectedGoalID = nil
+            }
+            .disabled(parseAmount(moneyAmountText) == nil)
+            .buttonStyle(.glassProminent)
+            .tint(theme.primary)
+        } header: {
+            Text("Add Money")
+                .font(.headline)
+                .foregroundStyle(theme.primary)
+                .textCase(nil)
+        }
+    }
+
+    @ViewBuilder
+    private func moneyEntriesSection() -> some View {
+        Section {
+            if moneyEntries.isEmpty {
+                Text("No money added yet.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(moneyEntries) { entry in
+                    moneyEntryRow(entry)
+                }
+            }
+        } header: {
+            Text("Money Added")
                 .font(.headline)
                 .foregroundStyle(theme.primary)
                 .textCase(nil)
@@ -244,6 +323,40 @@ struct GrapherView: View {
 
             Button(role: .destructive) {
                 modelContext.delete(expense)
+                try? modelContext.save()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func moneyEntryRow(_ entry: MoneyEntry) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(entry.amount.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD")))
+                    .foregroundStyle(theme.primary)
+                Spacer()
+                Text(entry.date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text(entry.goal?.title ?? "Unallocated")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+        .swipeActions {
+            Button(role: .destructive) {
+                modelContext.delete(entry)
+                try? modelContext.save()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                modelContext.delete(entry)
                 try? modelContext.save()
             } label: {
                 Label("Delete", systemImage: "trash")
