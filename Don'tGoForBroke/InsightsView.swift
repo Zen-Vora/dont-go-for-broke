@@ -49,39 +49,14 @@ struct InsightsView: View {
                 .font(.headline)
                 .foregroundStyle(theme.primary)
 
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Total spent")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(summary.totalAllTime, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .font(.title3)
-                        .bold()
-                }
-                Spacer()
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Last 30 days")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(summary.last30Total, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .font(.title3)
-                        .bold()
-                }
-            }
-
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Avg per day")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(summary.averageDailyLast30, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .font(.title3)
-                        .bold()
-                }
-                Spacer()
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
+                metricCell(title: "Total spent", value: summary.totalAllTime)
+                metricCell(title: "Last 30 days", value: summary.last30Total)
+                metricCell(title: "Avg per day", value: summary.averageDailyLast30)
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.secondary.opacity(0.25)), in: .rect(cornerRadius: 16))
     }
 
@@ -106,6 +81,7 @@ struct InsightsView: View {
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.tertiary.opacity(0.35)), in: .rect(cornerRadius: 16))
     }
 
@@ -129,6 +105,7 @@ struct InsightsView: View {
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.secondary.opacity(0.22)), in: .rect(cornerRadius: 16))
     }
 
@@ -152,7 +129,20 @@ struct InsightsView: View {
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.tertiary.opacity(0.28)), in: .rect(cornerRadius: 16))
+    }
+
+    private func metricCell(title: String, value: Double) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .font(.title3)
+                .bold()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
