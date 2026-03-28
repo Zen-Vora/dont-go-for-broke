@@ -63,10 +63,14 @@ struct GrapherView: View {
     @State private var date: Date = .now
     @State private var category: String = "General"
     @State private var isRecurring: Bool = false
+    @State private var titleTouched: Bool = false
+    @State private var amountTouched: Bool = false
+    @State private var categoryTouched: Bool = false
 
     @State private var moneyAmountText: String = ""
     @State private var moneyDate: Date = .now
     @State private var selectedGoalID: PersistentIdentifier?
+    @State private var moneyAmountTouched: Bool = false
     
     @State private var editingExpense: Expense?
     @State private var editTitle: String = ""
@@ -75,6 +79,9 @@ struct GrapherView: View {
     @State private var editCategory: String = "General"
     @State private var editIsRecurring: Bool = false
     @State private var selectedExpense: Expense?
+    @State private var editTitleTouched: Bool = false
+    @State private var editAmountTouched: Bool = false
+    @State private var editCategoryTouched: Bool = false
     
     private var theme: ThemePalette { ThemePalette(accentChoice: accentChoice) }
 
@@ -148,10 +155,31 @@ struct GrapherView: View {
         editDate = expense.date
         editCategory = expense.category
         editIsRecurring = expense.isRecurring
+        editTitleTouched = false
+        editAmountTouched = false
+        editCategoryTouched = false
     }
 
     private var selectedGoal: Goal? {
         goals.first { $0.persistentModelID == selectedGoalID }
+    }
+
+    private var isTitleInvalid: Bool {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isAmountInvalid: Bool {
+        let trimmed = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || parseAmount(amountText) == nil
+    }
+
+    private var isCategoryInvalid: Bool {
+        category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isMoneyAmountInvalid: Bool {
+        let trimmed = moneyAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || parseAmount(moneyAmountText) == nil
     }
 
     @ViewBuilder
@@ -159,15 +187,42 @@ struct GrapherView: View {
         Section {
             TextField("Title", text: $title)
                 .listRowBackground(theme.tertiary.opacity(0.15))
+                .onChange(of: title) { _, _ in
+                    titleTouched = true
+                }
+            if titleTouched && isTitleInvalid {
+                Text("Title is required.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .listRowBackground(theme.tertiary.opacity(0.15))
+            }
             TextField("Amount", text: $amountText)
 #if os(iOS)
                 .keyboardType(.decimalPad)
 #endif
                 .listRowBackground(theme.tertiary.opacity(0.15))
+                .onChange(of: amountText) { _, _ in
+                    amountTouched = true
+                }
+            if amountTouched && isAmountInvalid {
+                Text("Enter a valid amount.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .listRowBackground(theme.tertiary.opacity(0.15))
+            }
             DatePicker("Date", selection: $date, displayedComponents: .date)
                 .listRowBackground(theme.tertiary.opacity(0.15))
             TextField("Category", text: $category)
                 .listRowBackground(theme.tertiary.opacity(0.15))
+                .onChange(of: category) { _, _ in
+                    categoryTouched = true
+                }
+            if categoryTouched && isCategoryInvalid {
+                Text("Category is required.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .listRowBackground(theme.tertiary.opacity(0.15))
+            }
             Toggle("Recurring", isOn: $isRecurring)
                 .listRowBackground(theme.tertiary.opacity(0.15))
 
@@ -188,8 +243,11 @@ struct GrapherView: View {
                 date = .now
                 category = "General"
                 isRecurring = false
+                titleTouched = false
+                amountTouched = false
+                categoryTouched = false
             }
-            .disabled(title.isEmpty || parseAmount(amountText) == nil)
+            .disabled(isTitleInvalid || isAmountInvalid || isCategoryInvalid)
             .buttonStyle(.glassProminent)
             .tint(theme.primary)
         } header: {
@@ -208,6 +266,15 @@ struct GrapherView: View {
                 .keyboardType(.decimalPad)
 #endif
                 .listRowBackground(theme.tertiary.opacity(0.15))
+                .onChange(of: moneyAmountText) { _, _ in
+                    moneyAmountTouched = true
+                }
+            if moneyAmountTouched && isMoneyAmountInvalid {
+                Text("Enter a valid amount.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .listRowBackground(theme.tertiary.opacity(0.15))
+            }
             DatePicker("Date", selection: $moneyDate, displayedComponents: .date)
                 .listRowBackground(theme.tertiary.opacity(0.15))
 
@@ -235,8 +302,9 @@ struct GrapherView: View {
                 moneyAmountText = ""
                 moneyDate = .now
                 selectedGoalID = nil
+                moneyAmountTouched = false
             }
-            .disabled(parseAmount(moneyAmountText) == nil)
+            .disabled(isMoneyAmountInvalid)
             .buttonStyle(.glassProminent)
             .tint(theme.primary)
         } header: {
@@ -371,15 +439,42 @@ struct GrapherView: View {
                 Section {
                     TextField("Title", text: $editTitle)
                         .listRowBackground(theme.tertiary.opacity(0.15))
+                        .onChange(of: editTitle) { _, _ in
+                            editTitleTouched = true
+                        }
+                    if editTitleTouched && isEditTitleInvalid {
+                        Text("Title is required.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .listRowBackground(theme.tertiary.opacity(0.15))
+                    }
                     TextField("Amount", text: $editAmountText)
 #if os(iOS)
                         .keyboardType(.decimalPad)
 #endif
                         .listRowBackground(theme.tertiary.opacity(0.15))
+                        .onChange(of: editAmountText) { _, _ in
+                            editAmountTouched = true
+                        }
+                    if editAmountTouched && isEditAmountInvalid {
+                        Text("Enter a valid amount.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .listRowBackground(theme.tertiary.opacity(0.15))
+                    }
                     DatePicker("Date", selection: $editDate, displayedComponents: .date)
                         .listRowBackground(theme.tertiary.opacity(0.15))
                     TextField("Category", text: $editCategory)
                         .listRowBackground(theme.tertiary.opacity(0.15))
+                        .onChange(of: editCategory) { _, _ in
+                            editCategoryTouched = true
+                        }
+                    if editCategoryTouched && isEditCategoryInvalid {
+                        Text("Category is required.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .listRowBackground(theme.tertiary.opacity(0.15))
+                    }
                     Toggle("Recurring", isOn: $editIsRecurring)
                         .listRowBackground(theme.tertiary.opacity(0.15))
                 } header: {
@@ -416,10 +511,23 @@ struct GrapherView: View {
                             editingExpense = nil
                         }
                     }
-                    .disabled(parseAmount(editAmountText) == nil || editTitle.isEmpty)
+                    .disabled(isEditTitleInvalid || isEditAmountInvalid || isEditCategoryInvalid)
                 }
             }
         }
+    }
+
+    private var isEditTitleInvalid: Bool {
+        editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isEditAmountInvalid: Bool {
+        let trimmed = editAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || parseAmount(editAmountText) == nil
+    }
+
+    private var isEditCategoryInvalid: Bool {
+        editCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

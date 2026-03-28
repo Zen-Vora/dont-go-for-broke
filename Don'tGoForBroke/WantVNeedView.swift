@@ -436,6 +436,7 @@ struct WantVNeedView: View {
 struct NumberInputView: View {
     let theme: ThemePalette
     @State private var valueString = ""
+    @State private var valueTouched: Bool = false
     var onDone: (Double) -> Void
     var body: some View {
         VStack {
@@ -450,44 +451,46 @@ struct NumberInputView: View {
                         .fill(theme.secondary.opacity(0.22))
                 )
                 .padding()
+                .onChange(of: valueString) { _, _ in
+                    valueTouched = true
+                }
+            if valueTouched && isValueInvalid {
+                Text("Enter a valid number.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
             Button("Next") {
                 // Allow currency symbols and formatting; strip everything except digits, decimal separators, and minus
-                let sanitized = valueString
-                    .replacingOccurrences(of: ",", with: "")
-                    .replacingOccurrences(of: " ", with: "")
-                    .replacingOccurrences(of: "€", with: "")
-                    .replacingOccurrences(of: "£", with: "")
-                    .replacingOccurrences(of: "¥", with: "")
-                    .replacingOccurrences(of: "₹", with: "")
-                    .replacingOccurrences(of: "₩", with: "")
-                    .replacingOccurrences(of: "₽", with: "")
-                    .replacingOccurrences(of: "₺", with: "")
-                    .replacingOccurrences(of: "₫", with: "")
-                    .replacingOccurrences(of: "₴", with: "")
-                    .replacingOccurrences(of: "R$", with: "")
-                    .replacingOccurrences(of: "$", with: "")
-                let val = Double(sanitized) ?? 0
+                let val = Double(sanitizedValue) ?? 0
                 onDone(val)
             }
             .disabled({
-                let sanitized = valueString
-                    .replacingOccurrences(of: ",", with: "")
-                    .replacingOccurrences(of: " ", with: "")
-                    .replacingOccurrences(of: "€", with: "")
-                    .replacingOccurrences(of: "£", with: "")
-                    .replacingOccurrences(of: "¥", with: "")
-                    .replacingOccurrences(of: "₹", with: "")
-                    .replacingOccurrences(of: "₩", with: "")
-                    .replacingOccurrences(of: "₽", with: "")
-                    .replacingOccurrences(of: "₺", with: "")
-                    .replacingOccurrences(of: "₫", with: "")
-                    .replacingOccurrences(of: "₴", with: "")
-                    .replacingOccurrences(of: "R$", with: "")
-                    .replacingOccurrences(of: "$", with: "")
-                return Double(sanitized) == nil
+                return Double(sanitizedValue) == nil
             }())
             .buttonStyle(.glassProminent)
         }
+    }
+
+    private var sanitizedValue: String {
+        valueString
+            .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "€", with: "")
+            .replacingOccurrences(of: "£", with: "")
+            .replacingOccurrences(of: "¥", with: "")
+            .replacingOccurrences(of: "₹", with: "")
+            .replacingOccurrences(of: "₩", with: "")
+            .replacingOccurrences(of: "₽", with: "")
+            .replacingOccurrences(of: "₺", with: "")
+            .replacingOccurrences(of: "₫", with: "")
+            .replacingOccurrences(of: "₴", with: "")
+            .replacingOccurrences(of: "R$", with: "")
+            .replacingOccurrences(of: "$", with: "")
+    }
+
+    private var isValueInvalid: Bool {
+        let trimmed = valueString.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && Double(sanitizedValue) == nil
     }
 }
 

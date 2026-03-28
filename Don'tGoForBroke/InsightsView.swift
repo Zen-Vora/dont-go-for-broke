@@ -30,6 +30,9 @@ struct InsightsView: View {
                         description: Text("Add an expense to unlock insights.")
                     )
                 } else {
+                    if let latest = expenses.first {
+                        recentExpensePill(latest)
+                    }
                     summaryCard(summary)
                     trendCard(summary)
                     categoryCard(summary)
@@ -131,6 +134,29 @@ struct InsightsView: View {
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(theme.tertiary.opacity(0.28)), in: .rect(cornerRadius: 16))
+    }
+
+    private func recentExpensePill(_ expense: Expense) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "clock")
+                .foregroundStyle(theme.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Most recent")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(expense.title)
+                    .font(.subheadline)
+                    .bold()
+            }
+            Spacer()
+            Text(expense.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .font(.subheadline)
+                .foregroundStyle(theme.primary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(theme.secondary.opacity(0.20)), in: .capsule)
     }
 
     private func metricCell(title: String, value: Double) -> some View {

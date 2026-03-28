@@ -10,8 +10,16 @@ struct GoalEditorView: View {
     @State private var targetAmountText: String
     @State private var targetDateEnabled: Bool
     @State private var targetDate: Date
+    @FocusState private var focusedField: Field?
+    @State private var titleTouched: Bool = false
+    @State private var amountTouched: Bool = false
 
     var onSave: (Goal) -> Void
+
+    private enum Field {
+        case title
+        case amount
+    }
 
     init(prefillTitle: String = "",
          prefillAmount: Decimal? = nil,
@@ -29,10 +37,32 @@ struct GoalEditorView: View {
             Form {
                 Section("Goal") {
                     TextField("Title", text: $title)
+                        .focused($focusedField, equals: .title)
+                        .submitLabel(.next)
+                        .onSubmit {
+                            focusedField = .amount
+                        }
+                        .onChange(of: title) { _, _ in
+                            titleTouched = true
+                        }
+                    if titleTouched && isTitleInvalid {
+                        Text("Title is required.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                     TextField("Target amount", text: $targetAmountText)
 #if os(iOS)
                         .keyboardType(.decimalPad)
 #endif
+                        .focused($focusedField, equals: .amount)
+                        .onChange(of: targetAmountText) { _, _ in
+                            amountTouched = true
+                        }
+                    if amountTouched && isAmountInvalid && !targetAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Enter a valid amount.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                     Toggle("Set target date", isOn: $targetDateEnabled)
                     if targetDateEnabled {
                         DatePicker("Target date", selection: $targetDate, displayedComponents: .date)
@@ -65,14 +95,27 @@ struct GoalEditorView: View {
                         onSave(goal)
                         dismiss()
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || Decimal(string: sanitizedAmountText(targetAmountText)) == nil)
+                    .disabled(isTitleInvalid || isAmountInvalid)
                 }
             }
+        }
+        .onAppear {
+            titleTouched = false
+            amountTouched = false
         }
     }
 
     private var parsedTargetAmount: Decimal? {
         Decimal(string: sanitizedAmountText(targetAmountText))
+    }
+
+    private var isTitleInvalid: Bool {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isAmountInvalid: Bool {
+        let trimmed = targetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || Decimal(string: sanitizedAmountText(targetAmountText)) == nil
     }
 
     @ViewBuilder

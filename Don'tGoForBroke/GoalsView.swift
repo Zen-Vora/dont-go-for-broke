@@ -11,6 +11,13 @@ struct GoalsView: View {
 
     @State private var showingAddGoal = false
     @State private var editingGoal: Goal?
+    @State private var moneyAmountText: String = ""
+    @State private var moneyDate: Date = .now
+    @State private var selectedGoalID: PersistentIdentifier?
+    @State private var allocationSelections: [PersistentIdentifier: PersistentIdentifier?] = [:]
+    @AppStorage("settings.lastGoalAllocationTitle") private var lastGoalAllocationTitle: String = ""
+    @FocusState private var isMoneyAmountFocused: Bool
+    @State private var moneyAmountTouched: Bool = false
 
     private var theme: ThemePalette { ThemePalette(accentChoice: accentChoice) }
 
@@ -18,6 +25,9 @@ struct GoalsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+
+                addMoneySection
+                unallocatedSection
 
                 if goals.isEmpty {
                     ContentUnavailableView(
@@ -55,6 +65,15 @@ struct GoalsView: View {
                 }
             )
         }
+        .onAppear {
+            if selectedGoalID == nil, !lastGoalAllocationTitle.isEmpty {
+                selectedGoalID = goals.first { $0.title == lastGoalAllocationTitle }?.persistentModelID
+            }
+        }
+    }
+
+    private var selectedGoal: Goal? {
+        goals.first { $0.persistentModelID == selectedGoalID }
     }
 
     private var header: some View {
@@ -76,6 +95,142 @@ struct GoalsView: View {
             .buttonStyle(.glassProminent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var addMoneySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Add Money")
+                    .font(.headline)
+                    .foregroundStyle(theme.primary)
+                Spacer()
+            }
+
+            TextField("Amount", text: $moneyAmountText)
+#if os(iOS)
+                .keyboardType(.decimalPad)
+#endif
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .focused($isMoneyAmountFocused)
+                .onChange(of: moneyAmountText) { _, _ in
+                    moneyAmountTouched = true
+                }
+
+            if moneyAmountTouched && !moneyAmountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && parseAmount(moneyAmountText) == nil {
+                Text("Enter a valid amount.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            DatePicker("Date", selection: $moneyDate, displayedComponents: .date)
+
+            if goals.isEmpty {
+                Text("Create a goal to allocate savings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("Allocate to goal", selection: $selectedGoalID) {
+                    Text("No goal").tag(Optional<PersistentIdentifier>.none)
+                    ForEach(goals) { goal in
+                        Text(goal.title).tag(Optional(goal.persistentModelID))
+                    }
+                }
+                .onChange(of: selectedGoalID) { _, newValue in
+                    if let newValue, let goal = goals.first(where: { $0.persistentModelID == newValue }) {
+                        lastGoalAllocationTitle = goal.title
+                    } else if newValue == nil {
+                        lastGoalAllocationTitle = ""
+                    }
+                }
+            }
+
+            Button("Add Money") {
+                guard let amount = parseAmount(moneyAmountText) else { return }
+                let entry = MoneyEntry(amount: amount, date: moneyDate, goal: selectedGoal)
+                modelContext.insert(entry)
+                try? modelContext.save()
+
+                moneyAmountText = ""
+                moneyDate = .now
+                selectedGoalID = nil
+                moneyAmountTouched = false
+            }
+            .buttonStyle(.glassProminent)
+            .tint(theme.primary)
+            .disabled(parseAmount(moneyAmountText) == nil)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(theme.tertiary.opacity(0.22)), in: .rect(cornerRadius: 16))
+    }
+
+    private var unallocatedSection: some View {
+        let unallocated = moneyEntries.filter { $0.goal == nil }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Unallocated Money")
+                    .font(.headline)
+                    .foregroundStyle(theme.primary)
+                Spacer()
+            }
+
+            if unallocated.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("All money entries are allocated.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if goals.isEmpty {
+                        Text("Add a goal to start allocating.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button("Add money") {
+                            isMoneyAmountFocused = true
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                    }
+                }
+            } else {
+                ForEach(unallocated) { entry in
+                    let binding = allocationBinding(for: entry)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(entry.amount.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD")))
+                                .foregroundStyle(theme.primary)
+                            Spacer()
+                            Text(entry.date.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Picker("Allocate", selection: binding) {
+                            Text("No goal").tag(Optional<PersistentIdentifier>.none)
+                            ForEach(goals) { goal in
+                                Text(goal.title).tag(Optional(goal.persistentModelID))
+                            }
+                        }
+                        .onChange(of: binding.wrappedValue) { _, newValue in
+                            if let newValue {
+                                entry.goal = goals.first { $0.persistentModelID == newValue }
+                            } else {
+                                entry.goal = nil
+                            }
+                            try? modelContext.save()
+                        }
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(theme.tertiary.opacity(0.12))
+                    )
+                    .animation(.easeInOut(duration: 0.2), value: entry.goal?.persistentModelID)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(theme.secondary.opacity(0.20)), in: .rect(cornerRadius: 16))
     }
 
     private func goalCard(_ goal: Goal) -> some View {
@@ -178,7 +333,8 @@ struct GoalsView: View {
 
     private func goalPlanSummary(for goal: Goal, weeklySavings: Double) -> String? {
         let amount = (goal.targetAmount as NSDecimalNumber).doubleValue
-        guard amount > 0 else { return nil }
+        let remaining = max(0, amount - savedAmount(for: goal))
+        guard remaining > 0 else { return "Goal is fully funded." }
         if let targetDate = goal.targetDate {
             let calendar = Calendar.current
             let startDate = calendar.startOfDay(for: .now)
@@ -186,7 +342,7 @@ struct GoalsView: View {
             let dayCount = calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 0
             guard dayCount > 0 else { return "Target date is in the past." }
             let weeks = max(1, Int(ceil(Double(dayCount) / 7.0)))
-            let requiredWeekly = amount / Double(weeks)
+            let requiredWeekly = remaining / Double(weeks)
             if weeklySavings > 0 {
                 let extraWeekly = max(0, requiredWeekly - weeklySavings)
                 if extraWeekly > 0 {
@@ -197,7 +353,7 @@ struct GoalsView: View {
             return "Need \(formatCurrency(requiredWeekly)) per week to hit the date."
         }
         guard weeklySavings > 0 else { return nil }
-        let weeks = max(1, Int(ceil(amount / weeklySavings)))
+        let weeks = max(1, Int(ceil(remaining / weeklySavings)))
         return "At \(formatCurrency(weeklySavings))/week, you’ll reach it in \(weeks) weeks."
     }
 
@@ -214,6 +370,53 @@ struct GoalsView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
+    private func parseAmount(_ text: String) -> Decimal? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return nil }
+
+        let currencyFormatter = NumberFormatter()
+        currencyFormatter.numberStyle = .currency
+        currencyFormatter.locale = Locale.current
+        if let number = currencyFormatter.number(from: trimmed) {
+            return number.decimalValue
+        }
+
+        let decimalFormatter = NumberFormatter()
+        decimalFormatter.numberStyle = .decimal
+        decimalFormatter.locale = Locale.current
+        if let number = decimalFormatter.number(from: trimmed) {
+            return number.decimalValue
+        }
+
+        let currencySymbol = currencyFormatter.currencySymbol ?? "$"
+        let symbols = CharacterSet(charactersIn: currencySymbol).union(.whitespacesAndNewlines)
+        var cleaned = trimmed.components(separatedBy: symbols).joined()
+
+        let grouping = currencyFormatter.groupingSeparator ?? ","
+        cleaned = cleaned.replacingOccurrences(of: grouping, with: "")
+
+        let decimalSep = currencyFormatter.decimalSeparator ?? "."
+        if decimalSep != "." {
+            cleaned = cleaned.replacingOccurrences(of: decimalSep, with: ".")
+        }
+
+        let validSet = CharacterSet(charactersIn: "0123456789.-")
+        cleaned = cleaned.unicodeScalars.filter { validSet.contains($0) }.map(String.init).joined()
+
+        return Decimal(string: cleaned)
+    }
+
+    private func allocationBinding(for entry: MoneyEntry) -> Binding<PersistentIdentifier?> {
+        let key = entry.persistentModelID
+        if allocationSelections[key] == nil {
+            allocationSelections[key] = entry.goal?.persistentModelID
+        }
+        return Binding(
+            get: { allocationSelections[key] ?? entry.goal?.persistentModelID },
+            set: { allocationSelections[key] = $0 }
+        )
+    }
+
     private var currencyCode: String {
         Locale.current.currency?.identifier ?? "USD"
     }
@@ -226,6 +429,7 @@ private struct GoalPlannerView: View {
 
     @State private var weeklyIncomeText: String = ""
     @State private var localSavingsRate: Double = 0.2
+    @State private var weeklyIncomeTouched: Bool = false
 
     private var theme: ThemePalette { ThemePalette(accentChoice: accentChoice) }
 
@@ -241,11 +445,26 @@ private struct GoalPlannerView: View {
 #endif
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .onChange(of: weeklyIncomeText) { _, newValue in
-                    weeklyIncome = parsedIncome(from: newValue)
+                    weeklyIncomeTouched = true
+                    if let value = parsedIncome(from: newValue) {
+                        weeklyIncome = value
+                    } else if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        weeklyIncome = 0
+                    }
                 }
                 .onSubmit {
-                    weeklyIncome = parsedIncome(from: weeklyIncomeText)
+                    weeklyIncomeTouched = true
+                    if let value = parsedIncome(from: weeklyIncomeText) {
+                        weeklyIncome = value
+                    } else if weeklyIncomeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        weeklyIncome = 0
+                    }
                 }
+            if weeklyIncomeTouched && isWeeklyIncomeInvalid {
+                Text("Enter a valid income amount.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
 
             HStack {
                 Text("Savings rate")
@@ -263,14 +482,19 @@ private struct GoalPlannerView: View {
         .onAppear {
             weeklyIncomeText = weeklyIncome == 0 ? "" : String(format: "%.2f", weeklyIncome)
             localSavingsRate = savingsRate
+            weeklyIncomeTouched = false
         }
         .onDisappear {
-            weeklyIncome = parsedIncome(from: weeklyIncomeText)
+            if let value = parsedIncome(from: weeklyIncomeText) {
+                weeklyIncome = value
+            } else if weeklyIncomeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                weeklyIncome = 0
+            }
             savingsRate = localSavingsRate
         }
     }
 
-    private func parsedIncome(from text: String) -> Double {
+    private func parsedIncome(from text: String) -> Double? {
         let sanitized = text
             .replacingOccurrences(of: ",", with: "")
             .replacingOccurrences(of: " ", with: "")
@@ -285,7 +509,12 @@ private struct GoalPlannerView: View {
             .replacingOccurrences(of: "₫", with: "")
             .replacingOccurrences(of: "₴", with: "")
             .replacingOccurrences(of: "R$", with: "")
-        return Double(sanitized) ?? 0
+        return Double(sanitized)
+    }
+
+    private var isWeeklyIncomeInvalid: Bool {
+        let trimmed = weeklyIncomeText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && parsedIncome(from: weeklyIncomeText) == nil
     }
 }
 
